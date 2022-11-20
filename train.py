@@ -27,9 +27,7 @@ def initParams():
     parser.add_argument("-o", "--out-path", type=str, help="output folder", default='outputs/')
 
     parser.add_argument("-m", "--model", type=str, help="Pre-trained model path", default=None)
-    parser.add_argument("-mde", "--model_disc_emo", type=str, help="Pre-trained model path", default=None)
-    parser.add_argument("-mdf", "--model_disc_frame", type=str, help="Pre-trained model path", default=None)
-    
+ 
     parser.add_argument('--num_epochs', type=int, default=2000)
     parser.add_argument("--batch-size", type=int, default=1)
 
@@ -42,13 +40,6 @@ def initParams():
     parser.add_argument('--disc_word_len', type=float, default=1)
     parser.add_argument('--disc_emo', type=float, default=None)
 
-    parser.add_argument('--disc_frame_gp', type=float, help="Weight for gradient penalty of the frame discriminator.", default=10.0)
-    parser.add_argument('--disc_emo_gp', type=float, help="Weight for gradient penalty of the emotion discriminator.", default=10.0)
-
-    parser.add_argument('--disc_emo_weight', type=float, help="Weight for emotion losses in the emotion discriminator.", default=1000.0)
-    parser.add_argument('--emo_weight', type=float, default=10)
-
-    parser.add_argument('--plot_interval', type=int, default=10)
     parser.add_argument('--pre_train', type=bool, default=False)
 
     args = parser.parse_args()
@@ -57,7 +48,7 @@ def initParams():
 
     args.batch_size = args.batch_size * max(int(torch.cuda.device_count()), 1)
     args.text_dim = 20
-    args.emo_dim = 6
+    args.emo_dim = 3
     args.noise_dim = 5
     args.steplr = 200
     args.filename = args.filename
