@@ -4,7 +4,7 @@ import spacy
 spacy.require_gpu()
 nlp = spacy.load("en_core_web_sm")
 
-processed_labelling = pd.read_csv('./CREMA-D-master/SentenceFilenames.csv')
+processed_labelling = pd.read_csv('data/SentenceFilenames.csv')
 
 sentences = {
     "IEO": "It's eleven o'clock", 
