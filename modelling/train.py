@@ -25,23 +25,17 @@ def initParams():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("-f", "--filename", type=str, help="Input folder containing train data", default='data/clean_data.csv')
     parser.add_argument("-o", "--out-path", type=str, help="output folder", default='outputs/')
-
     parser.add_argument("-m", "--model", type=str, help="Pre-trained model path", default=None)
- 
     parser.add_argument('--num_epochs', type=int, default=2000)
     parser.add_argument("--batch-size", type=int, default=1)
-
-    parser.add_argument('--lr_g', type=float, default=1e-03)
-    parser.add_argument('--lr_dsc', type=float, default=1e-07)
-
+    parser.add_argument('--lr_g', type=float, default=1e-04)
+    parser.add_argument('--lr_dsc', type=float, default=1e-06)
     parser.add_argument("--gpu-no", type=str, help="select gpu", default='0')
     parser.add_argument('--seed', type=int, default=9)
 
     parser.add_argument('--disc_word_len', type=float, default=1)
     parser.add_argument('--disc_emo', type=float, default=None)
-
     parser.add_argument('--pre_train', type=bool, default=False)
-
     args = parser.parse_args()
 
     # os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_no
@@ -114,6 +108,8 @@ def train():
     generator.apply(init_weights)
     generator = nn.DataParallel(generator, device_ids)
 
+    emotion_proc = models.EMOTIONPROCESSOR(args).to(args.device)
+    emotion_proc = nn.DataParallel(emotion_proc, device_ids)
 
     if args.disc_word_len:
         disc_word_len = models.DISCWORDLEN(args).to(args.device)
@@ -138,6 +134,7 @@ def train():
     
     emoTrainer = trainer.emoTrainer(args, 
                          generator=generator,
+                         emotion_proc=emotion_proc,
                          disc_word_len=disc_word_len,
                          train_loader=train_loader,
                          val_loader=val_loader)
