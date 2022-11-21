@@ -22,7 +22,7 @@ class emoTrainer:
         self.disc_word_len = disc_word_len
         self.emotion_proc = emotion_proc
         
-        run_name = 'GAN_class' + str(self.args.emo_dim) + '_lrg' + str(args.lr_g) + '_lrd' + str(args.lr_dsc) + '_beta0.8' + '_Wass_onlyGANLoss'
+        run_name = 'GAN_class' + str(self.args.emo_dim) + '_lrg' + str(args.lr_g) + '_lrd' + str(args.lr_dsc) + '_bg0.5_bd0.7' + '_Wass_ReconsGANLoss_Noise5_std0.5'
         self.plotter = SummaryWriter('runs/' + run_name) 
         
         self.mse_loss = torch.nn.MSELoss()
@@ -92,6 +92,7 @@ class emoTrainer:
 
         # wdistance = -(loss_fake + loss_real).item()
         # self.loss_dict['df_wdistance'].append(wdistance)
+
         losslst = np.array([loss_fake.item(), loss_real.item(), loss.item()])
         return losslst
   
@@ -115,7 +116,7 @@ class emoTrainer:
         emo_loss = self.emo_loss(gen_emotion, torch.argmax(emo_label, dim=1))
         # print(sign_loss, emo_loss, recon_loss)
         
-        loss =  gan_loss #recon_loss + 0.5*sign_loss # + 0.1*emo_loss
+        loss =  gan_loss + recon_loss # + 0.5*sign_loss # + 0.1*emo_loss
         loss.backward()
         self.generator.module.opt.step()
 
@@ -123,7 +124,7 @@ class emoTrainer:
         #     self.unfreezeNet(self.disc_word_len)
 
         if np.random.random() > 0.995:
-            print(gen_relative_word_length[:2,...], relative_word_length[:2,...])
+            print(np.round(gen_relative_word_length[0,...].tolist(), 4), np.round(relative_word_length[0,...].tolist(), 4))
 
         losslst = np.array([recon_loss.item(),  emo_loss.item(), sign_loss.item(), gan_loss.item(), loss.item()])
         return losslst

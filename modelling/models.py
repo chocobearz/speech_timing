@@ -73,7 +73,7 @@ class NOISEGENERATOR(nn.Module):
     def __init__(self, args, debug=False):
         super(NOISEGENERATOR, self).__init__()
         self.args = args
-        self.noise = normal.Normal(0, 1)
+        self.noise = normal.Normal(0, 0.5)
         self.noise_rnn = nn.LSTM(self.args.noise_dim, self.args.noise_dim, num_layers=1, batch_first=True)
 
     def forward(self, z_spch):
@@ -111,7 +111,6 @@ class DECODER(nn.Module):
             # nn.Linear(self.args.text_dim*2+self.args.emo_dim, self.args.filters[-1]),
             nn.Linear(self.args.text_dim*2+self.args.noise_dim+self.args.emo_dim, self.args.filters[-1]),
             nn.LeakyReLU(0.2),
-            nn.Dropout(self.drp_rate),
         )
         # self.lstm_1 = nn.LSTM(input_size=self.args.text_dim*2+self.args.emo_dim, 
         self.lstm_1 = nn.LSTM(input_size=self.args.text_dim*2+self.args.noise_dim+self.args.emo_dim, 
@@ -145,7 +144,8 @@ class GENERATOR(nn.Module):
         self.emotion_processor = EMOTIONPROCESSOR(args)
         self.decoder = DECODER(args)
 
-        self.opt = optim.Adam(list(self.parameters()), lr = self.args.lr_g, betas=(0.8, 0.999))
+        self.opt = optim.Adam(list(self.parameters()), lr = self.args.lr_g, betas=(0.5, 0.999))
+        # self.opt = optim.RMSprop(list(self.parameters()), lr = self.args.lr_g)
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.opt, self.args.steplr, gamma=0.5, last_epoch=-1)
 
     def forward(self, emotion, pos_vec):
@@ -184,10 +184,11 @@ class DISCWORDLEN(nn.Module):
             nn.ReLU()
         )
         self.fc_2 = nn.Sequential(
-            nn.Linear(2+4, 1),
+            nn.Linear(3+4, 1),
             # nn.Sigmoid()
         )
-        self.opt = optim.Adam(list(self.parameters()), lr = self.args.lr_dsc, betas=(0.9, 0.999))
+        self.opt = optim.Adam(list(self.parameters()), lr = self.args.lr_dsc, betas=(0.7, 0.999))
+        # self.opt = optim.RMSprop(list(self.parameters()), lr = self.args.lr_dsc)
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.opt, self.args.steplr, gamma=0.5, last_epoch=-1) 
     
     def forward(self, emotion, relative_word_length):

@@ -28,7 +28,7 @@ def initParams():
     parser.add_argument("-m", "--model", type=str, help="Pre-trained model path", default=None)
     parser.add_argument('--num_epochs', type=int, default=2000)
     parser.add_argument("--batch-size", type=int, default=1)
-    parser.add_argument('--lr_g', type=float, default=1e-04)
+    parser.add_argument('--lr_g', type=float, default=1e-05)
     parser.add_argument('--lr_dsc', type=float, default=1e-06)
     parser.add_argument("--gpu-no", type=str, help="select gpu", default='0')
     parser.add_argument('--seed', type=int, default=9)
