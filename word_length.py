@@ -92,8 +92,8 @@ for root, dirs, files in os.walk(audioDirectory):
           new_row['neutral_relative_word_lengths'] = "NA"
       else:
         new_row['base_word_lengths'] = "NA"
-        new_row['pause_lenghts'] = "NA"
+        new_row['pause_lengths'] = "NA"
         new_row['neutral_relative_word_lengths'] = "NA"
       dataframe = pd.concat([dataframe, pd.Series(new_row).to_frame().T], ignore_index=True)
 
-dataframe.to_csv('wordLength.csv', index = False) 
+dataframe.to_csv('../data/word_length.csv', index = False) 
