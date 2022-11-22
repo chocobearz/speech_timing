@@ -4,9 +4,9 @@ import spacy
 spacy.require_gpu()
 nlp = spacy.load("en_core_web_sm")
 
-processed_labelling = pd.read_csv('./CREMA-D-master/SentenceFilenames.csv')
-audio_data = pd.read_csv('wordLength.csv')
-processed_labelling = pd.read_csv('./processed_data.csv')
+processed_labelling = pd.read_csv('../data/SentenceFilenames.csv')
+audio_data = pd.read_csv('../data/word_length.csv')
+processed_labelling = pd.read_csv('../data/processed_data.csv')
 
 sentences = {
     "IEO": "It's eleven o'clock", 
@@ -100,4 +100,4 @@ filtered_labelling_df = filtered_labelling_df[[
   'end',
 ]]
 
-filtered_labelling_df.to_csv('cleanData.csv', index = False) 
+filtered_labelling_df.to_csv('../data/clean_data.csv', index = False) 
