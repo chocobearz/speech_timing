@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from torch.distributions import normal
 import torch.optim as optim
 from torch.autograd import Variable
+from torch import autograd
 import numpy as np
 import math
 from train import initParams
@@ -61,8 +62,12 @@ class TEXTENCODER(nn.Module):
     def __init__(self, args, bnorm=True):
         super(TEXTENCODER, self).__init__() 
         self.args = args
-        self.lstm = nn.LSTM(input_size=54, hidden_size=self.args.text_dim, num_layers=2, bidirectional=True, batch_first=True)
-        self.FCN = nn.Sequential(nn.Linear(self.args.text_dim*2, self.args.text_dim))
+        self.fc_0 = nn.Sequential(nn.Linear(54, 16),
+                        nn.Tanh())
+        self.lstm = nn.LSTM(input_size=16, hidden_size=self.args.text_dim, num_layers=2, bidirectional=True, batch_first=True)
+        self.FCN = nn.Sequential(nn.Linear(16, self.args.text_dim),
+                                nn.BatchNorm1d(num_features=7),
+                                nn.Tanh())
 
         self.conv = nn.Sequential(nn.Conv2d(in_channels=1, out_channels=3, kernel_size=3, stride=1, padding=1),
                                   nn.ReLU(),
@@ -73,14 +78,15 @@ class TEXTENCODER(nn.Module):
         self.fc_1 = nn.Sequential(nn.Linear(54, 16))
 
     def forward(self, x):
-        Q = K = V = x 
-        attn_output, attn_output_weights = self.multihead_attn(Q, K, V)
-        # print(attn_output.shape, x.shape)
-        out = self.fc_1(attn_output)
+        # Q = K = V = x 
+        # attn_output, attn_output_weights = self.multihead_attn(Q, K, V)
+        # # print(attn_output.shape, x.shape)
+        # out = self.fc_1(attn_output)
+        x = self.fc_0(x)
         # x, _ = self.lstm(x)
         # x = x.unsqueeze(dim=1)
         # x = self.conv(x).squeeze(dim=1)
-        # out = self.FCN(x)
+        out = self.FCN(x)
         # out = self.leakyrelu(x)
         return out
 
@@ -97,7 +103,7 @@ class NOISEGENERATOR(nn.Module):
         self.noise_rnn.flatten_parameters()
         noise = []
         for i in range(z_spch.size(1)):
-            noise.append(self.noise.sample((z_spch.size(0), self.args.noise_dim)))
+            noise.append(self.noise.sample((z_spch.size(0), self.args.noise_dim//2)))
         noise = torch.stack(noise, 1).to(self.args.device)
         # noise, _ = self.noise_rnn(noise)
         return noise
@@ -116,6 +122,21 @@ class EMOTIONPROCESSOR(nn.Module):
     def forward(self, emotion_cond):
         emotion_cond = self.fc_1(emotion_cond)
         return emotion_cond
+    
+
+# BxNx10
+class PEOPLEPROCESSOR(nn.Module):
+    def __init__(self, args, debug=False):
+        super(PEOPLEPROCESSOR, self).__init__()
+        self.args = args
+        self.fc_1 = nn.Sequential(
+            nn.Linear(82, 32),
+            nn.ReLU(),
+            nn.Linear(32, self.args.people_dim)
+        )
+    def forward(self, people_cond):
+        people_cond = self.fc_1(people_cond)
+        return people_cond
 
 
 class DECODER(nn.Module):
@@ -135,30 +156,25 @@ class DECODER(nn.Module):
         self.lstm_2 = nn.Sequential(nn.Tanh(),
                                   nn.LSTM(input_size=self.args.filters[0], hidden_size=1, num_layers=1, batch_first=True))
 
-        self.conv = nn.Sequential(nn.Conv2d(in_channels=1, out_channels=3, kernel_size=3, stride=1, padding=1),
-                                  nn.Conv2d(in_channels=3, out_channels=5, kernel_size=3, stride=1, padding=1),
-                                  nn.ReLU(),
-                                  nn.Conv2d(in_channels=5, out_channels=1, kernel_size=3, stride=1, padding=1))
         self.FCN = nn.Sequential(nn.Linear(self.args.text_dim+self.args.emo_dim, self.args.filters[0]),
                                  nn.Linear(self.args.filters[0], self.args.MAX_LEN),
                                  nn.Tanh(),
                                  nn.Linear(self.args.MAX_LEN, 1))
         
-
+        in_dim = 42
         self.emo_classifier = nn.Sequential(
-            nn.Linear(40, self.args.emo_dim),
+            nn.Linear(in_dim, self.args.emo_dim),
             # nn.Linear(self.args.text_dim*3+self.args.emo_dim, self.args.emo_dim),
             nn.LeakyReLU(0.2),
             nn.Flatten(),
             nn.Linear(self.args.emo_dim*self.args.MAX_LEN, self.args.emo_dim),
-            nn.ReLU()
+            nn.LeakyReLU(0.2)
         )
         self.tanh = nn.Tanh()
 
-        self.multihead_attn = nn.MultiheadAttention(embed_dim=40, num_heads=8)
-        self.fc_1 = nn.Sequential(nn.Linear(40, 8),
-                                nn.ReLU(),
-                                nn.Linear(8, 1))
+        self.multihead_attn = nn.MultiheadAttention(embed_dim=in_dim, num_heads=7)
+        self.fc_1 = nn.Sequential(nn.Linear(in_dim, 1),
+                                nn.Tanh())
         
     def forward(self, encodings_vec):
         # h, _ = self.lstm_1(encodings_vec)
@@ -186,18 +202,23 @@ class GENERATOR(nn.Module):
         self.text_encoder = TEXTENCODER(args)
         self.noise_generator = NOISEGENERATOR(args)
         self.emotion_processor = EMOTIONPROCESSOR(args)
+        self.people_processor = PEOPLEPROCESSOR(args)
+
         self.decoder = DECODER(args)
 
-        # self.opt = optim.Adam(list(self.parameters()), lr = self.args.lr_g, betas=(0.5, 0.999))
+        # self.opt = optim.Adam(list(self.parameters()), lr = self.args.lr_g, betas=(0.5, 0.9))
         self.opt = optim.RMSprop(list(self.parameters()), lr = self.args.lr_g)
 
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.opt, self.args.steplr, gamma=0.6, last_epoch=-1)
 
-    def forward(self, emotion, pos_vec):
+    def forward(self, emotion, pos_vec, people_vec):
         z_text = self.text_encoder(pos_vec)
         z_emo = self.emotion_processor(emotion)
         z_emo = z_emo.unsqueeze(1).repeat(1, z_text.size(1), 1)
-        z = torch.cat((z_text, z_emo), 2)
+        z_people = self.people_processor(people_vec)
+        z_people = z_people.unsqueeze(1).repeat(1, z_text.size(1), 1)
+
+        z = torch.cat((z_text, z_emo, z_people), 2)
         z_noise = self.noise_generator(z)
 
         # Concatenate noise
@@ -207,7 +228,7 @@ class GENERATOR(nn.Module):
         # z += z_noise
         
         gen_emotion, gen_word_len = self.decoder(z)
-
+        # print("gen_word_len", gen_word_len.shape)
         if self.debug:
             return gen_word_len
         else:
@@ -225,9 +246,13 @@ class DISCWORDLEN(nn.Module):
         )
         self.fc_2 = nn.Sequential(
             nn.Linear(7+2, 1),
-            # nn.Sigmoid()
         )
-        # self.opt = optim.Adam(list(self.parameters()), lr = self.args.lr_dsc, betas=(0.7, 0.999))
+        if args.criterion == 'BCE':
+            self.fc_2 = nn.Sequential(
+            nn.Linear(7+2, 1),
+            nn.Sigmoid()
+        )
+        # self.opt = optim.Adam(list(self.parameters()), lr = self.args.lr_dsc, betas=(0.5, 0.9))
         self.opt = optim.RMSprop(list(self.parameters()), lr = self.args.lr_dsc)
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.opt, self.args.steplr, gamma=0.6, last_epoch=-1) 
     
@@ -235,12 +260,39 @@ class DISCWORDLEN(nn.Module):
         # features = torch.tensor([torch.std(relative_word_length, dim=1), torch.max(relative_word_length, dim=1), torch.min(relative_word_length, dim=1), torch.mean(relative_word_length, dim=1)])
         # features = features.unsqueeze(dim=0)
         
-        
         emotion = self.fc_1(emotion)
-        # print(emotion.shape, relative_word_length.shape)
         h_ = torch.cat((emotion, relative_word_length), 1)
+        # print(emotion.shape, relative_word_length.shape, h_.shape)
+
         h = self.fc_2(h_)
         return h
+    
+    def compute_gp(self, real_data, fake_data, emotion):
+        batch_size = real_data.size(0)
+        # Sample Epsilon from uniform distribution
+        eps = torch.rand(batch_size, 1).to(real_data.device)
+        eps = eps.expand_as(real_data)
+        
+        # Interpolation between real data and fake data.
+        interpolation = eps * real_data + (1 - eps) * fake_data
+        interpolation.requires_grad_(True)
+        # get logits for interpolated images
+        interp_logits = self.forward(emotion, interpolation)
+        grad_outputs = torch.ones_like(interp_logits)
+        
+        # Compute Gradients
+        gradients = autograd.grad(
+            outputs=interp_logits,
+            inputs=interpolation,
+            grad_outputs=grad_outputs,
+            create_graph=True,
+            retain_graph=True
+        )[0]
+        
+        # Compute and return Gradient Norm
+        gradients = gradients.view(batch_size, -1)
+        grad_norm = gradients.norm(2, 1)
+        return torch.mean((grad_norm - 1) ** 2)
 
 
 class DISCEMO(nn.Module):

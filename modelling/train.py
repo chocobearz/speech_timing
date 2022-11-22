@@ -27,7 +27,7 @@ def initParams():
     parser.add_argument("-o", "--out-path", type=str, help="output folder", default='outputs/')
     parser.add_argument("-m", "--model", type=str, help="Pre-trained model path", default=None)
     parser.add_argument('--num_epochs', type=int, default=2000)
-    parser.add_argument("--batch-size", type=int, default=32)
+    parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument('--lr_g', type=float, default=0.00005)
     parser.add_argument('--lr_dsc', type=float, default=0.00005)
     parser.add_argument("--gpu-no", type=str, help="select gpu", default='0')
@@ -42,11 +42,14 @@ def initParams():
 
     args.batch_size = args.batch_size * max(int(torch.cuda.device_count()), 1)
     args.text_dim = 20
-    args.emo_dim = 4
+    args.emo_dim = 6
     args.noise_dim = args.text_dim
+    args.people_dim = 6
+
     args.steplr = 200
     args.filename = args.filename
     args.MAX_LEN = 7
+    args.criterion = 'Wass'
 
     args.filters = [16, 32, 32, 32]
     #-----------------------------------------#
@@ -95,12 +98,12 @@ def train():
 
     train_loader = torch.utils.data.DataLoader(trainDset,
                                                batch_size=args.batch_size, 
-                                               shuffle=True,
+                                               shuffle=False,
                                                drop_last=True,
                                                **args.kwargs)
     val_loader = torch.utils.data.DataLoader(valDset,
                                                batch_size=4, 
-                                               shuffle=True,
+                                               shuffle=False,
                                                drop_last=True,
                                                **args.kwargs)
     device_ids = list(range(torch.cuda.device_count()))

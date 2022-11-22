@@ -22,13 +22,18 @@ class emoTrainer:
         self.disc_word_len = disc_word_len
         self.emotion_proc = emotion_proc
         
-        run_name = 'GAN_class' + str(self.args.emo_dim) + '_lrg' + str(args.lr_g) + '_lrd' + str(args.lr_dsc) + '_b0.6' + '_WassDis_Pad_Att_Clamp03'
+        run_name = 'GAN_class' + str(self.args.emo_dim) + '_lrg' + str(args.lr_g) + '_lrd' + str(args.lr_dsc) + '_Wass_Pad_Att_Clamp03_Noise10_1by7_Pretrain100_reconsMeanVar_People'
         # run_name = '0'
         self.plotter = SummaryWriter('runs/' + run_name) 
         
         self.mse_loss = torch.nn.MSELoss(reduction='mean')
         self.emo_loss = nn.CrossEntropyLoss(reduction='mean')
+        self.BCE = nn.CrossEntropyLoss(reduction='mean')
         self.global_step = 0
+        if self.args.criterion == 'BCE':
+            self.criterion = self.GAN_BCELoss
+        else:
+            self.criterion = self.GAN_WasserteinLoss
     
     def freezeNet(self, network):
         for p in network.parameters():
@@ -67,9 +72,13 @@ class emoTrainer:
     # BCE loss
     def GAN_BCELoss(self, logit, label):
         if label == 'real':
-            return torch.mean(-torch.log(logit))
+            target = torch.ones([self.args.batch_size, 1])
+            return self.BCE(logit, target)
+            # return torch.mean(-torch.log(logit))
         if label == 'fake':
-            return torch.mean(-torch.log(1-logit))
+            target = torch.zeros([self.args.batch_size, 1])
+            return self.BCE(logit, target)
+            # return torch.mean(-torch.log(1-logit))
 
     def GAN_WasserteinLoss(self, logit, label):
         if label == 'real':
@@ -85,17 +94,24 @@ class emoTrainer:
         # emo_proc = self.emotion_proc(emo_label)
         logit_fake = self.disc_word_len(emo_label, gen_relative_word_length)
         logit_real = self.disc_word_len(emo_label, relative_word_length)
-        loss_fake = self.GAN_WasserteinLoss(logit_fake, 'fake')
-        loss_real = self.GAN_WasserteinLoss(logit_real, 'real')
+        loss_fake = self.criterion(logit_fake, 'fake')
+        loss_real = self.criterion(logit_real, 'real')
         loss = loss_fake + loss_real
-        loss.backward()
 
         torch.nn.utils.clip_grad_norm_(self.disc_word_len.parameters(), 1.)
+        
+        loss.backward()
         self.disc_word_len.module.opt.step()
 
-        with torch.no_grad():
-            for param in self.disc_word_len.parameters():
-                param.clamp_(-0.3, 0.3)
+        if self.criterion == self.GAN_WasserteinLoss:
+            # Clip the gradients
+            with torch.no_grad():
+                for param in self.disc_word_len.parameters():
+                    param.clamp_(-0.3, 0.3)
+            # # Gradient penalty
+            # gradpenalty = self.disc_word_len.module.compute_gp(gen_relative_word_length, relative_word_length, emo_label)
+            # loss += 5*gradpenalty
+
 
         # wdistance = -(loss_fake + loss_real).item()
         # self.loss_dict['df_wdistance'].append(wdistance)
@@ -108,17 +124,20 @@ class emoTrainer:
         self.disc_word_len.eval()
 
         self.generator.train()
-        relative_word_length, emo_label, pos_vec = data
+        relative_word_length, emo_label, emotions_vec, pos_vec, people_vec = data
         self.generator.module.opt.zero_grad()
-        gen_emotion, gen_relative_word_length  = self.generator(emo_label, pos_vec)
+        gen_emotion, gen_relative_word_length  = self.generator(emotions_vec, pos_vec, people_vec)
         
-        df = self.disc_word_len.forward(emo_label, gen_relative_word_length)
-        gan_loss = self.GAN_WasserteinLoss(df, 'fake')
+        df = self.disc_word_len.forward(emotions_vec, gen_relative_word_length)
+        gan_loss = self.criterion(df, 'fake')
 
-        recon_loss = self.mse_loss(relative_word_length, gen_relative_word_length)
+        # recon_loss = self.mse_loss(relative_word_length, gen_relative_word_length)
+        recon_mean_loss = self.mse_loss(relative_word_length.mean(dim=1), gen_relative_word_length.mean(dim=1))
+        recon_var_loss = self.mse_loss(relative_word_length.var(dim=1), gen_relative_word_length.var(dim=1))
+        recon_loss = recon_mean_loss + recon_var_loss
+
         sign_loss = self.sign_loss(relative_word_length, gen_relative_word_length)
-        emo_loss = self.emo_loss(gen_emotion, torch.argmax(emo_label, dim=1))
-        # print(sign_loss, emo_loss, recon_loss)
+        # emo_loss = self.emo_loss(gen_emotion, emo_label)
         
         loss =  gan_loss + 2*recon_loss #+ 0.5*sign_loss # + 0.1*emo_loss
         loss.backward()
@@ -128,37 +147,36 @@ class emoTrainer:
         if np.random.random() > 0.995:
             print(np.round(gen_relative_word_length[:2,...].tolist(), 4), np.round(relative_word_length[:2,...].tolist(), 4), flush=True)
 
-        losslst = np.array([recon_loss.item(),  emo_loss.item(), sign_loss.item(), gan_loss.item(), loss.item()])
+        losslst = np.array([recon_loss.item(),  sign_loss.item(), gan_loss.item(), loss.item()])
         return losslst
 
 
     def train(self):
         for epoch in tqdm(range(self.args.num_epochs)):
-
-            gen_losses = np.array([0.,0.,0.,0.,0.])
+            gen_losses = np.array([0.,0.,0.,0.])
             dsc_losses = np.array([0.,0.,0.])
             diterator = iter(self.train_loader)
             for t in range(len(self.train_loader)):               
-                relative_word_length, emotion, pos_vec = [d.float().to(self.args.device) for d in next(diterator)]
-                data = [relative_word_length, emotion, pos_vec]
-                                
-                if self.global_step%10 == 0:
+                relative_word_length, emotion_label, emotions_vec, pos_vec, people_vec = [d.float().to(self.args.device) for d in next(diterator)]
+                data = [relative_word_length, emotion_label, emotions_vec, pos_vec, people_vec]
+                
+                if epoch > 100 and self.global_step%7 == 0:
                     gen_losses += self.step_generator(data)
                 else:
                     with torch.no_grad():
-                        gen_emotion, gen_relative_word_length = self.generator(emotion, pos_vec)
-                    data = [gen_relative_word_length, relative_word_length, gen_emotion, emotion]
+                        gen_emotion, gen_relative_word_length = self.generator(emotions_vec, pos_vec, people_vec)
+                    data = [gen_relative_word_length, relative_word_length, gen_emotion, emotions_vec]
                     dsc_losses += self.step_disc_wordlen(data, epoch)
                 self.global_step += 1
-
+            
             # self.schdulerStep()
 
             length = len(self.train_loader)
             self.plotter.add_scalar("lossgen/recons", gen_losses[0]/length, epoch)
             # self.plotter.add_scalar("lossgen/emo", gen_losses[1]/length, epoch)
             # self.plotter.add_scalar("lossgen/sign", gen_losses[2]/length, epoch)
-            self.plotter.add_scalar("lossgen/real", gen_losses[3]/length, epoch)
-            self.plotter.add_scalar("lossgen/", gen_losses[4]/length, epoch)
+            self.plotter.add_scalar("lossgen/real", gen_losses[2]/length, epoch)
+            self.plotter.add_scalar("lossgen/", gen_losses[3]/length, epoch)
             # self.plotter.add_scalar("learning_rate/", gen_losses[4], epoch)
 
             self.plotter.add_scalar("lossdisc/fake", dsc_losses[0]/length, epoch)

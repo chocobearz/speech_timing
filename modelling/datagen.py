@@ -66,7 +66,26 @@ def get_word_embeddings(text_lst):
     return text_vectors
 
 
+def get_people_vector(person_lst):
+    unique_people = set(person_lst)
+    nunique_people = len(unique_people)
+    print("Total number of unique people: ", nunique_people)
+
+    word_dict = dict()
+    i = 0
+    for p in unique_people:
+        x = [0]*(nunique_people+1)
+        x[i] = 1
+        i += 1
+        word_dict[p] = x
+    x = [0]*(nunique_people+1)
+
+    people_vectors = [word_dict[k] for k in person_lst]
+    return people_vectors
+
+
 def process_data(data):
+    data = data.sort_values('emotion')
     text = [x.split() for x in data.script]
     text_vectors = get_word_embeddings(text)
 
@@ -78,10 +97,13 @@ def process_data(data):
         x = [0]*len(emotion_dict)
         x[emotion_dict[emotions[i]]] = 1
         emotions_vec.append(x)
-    emotions = [emotion_dict[x] for x in emotions]
+    emotion_label = [emotion_dict[x] for x in emotions]
 
     pos_seq = [x[1:-1].replace('\'','').replace(',','').split() for x in data.pos]
     pos_vectors = get_pos_vector(pos_seq)
+
+    person_lst = [x.split('_')[0] for x in data.filename.tolist()]
+    person_vec = get_people_vector(person_lst)
     
     base_word_lengths = [len(x) for x in text]
     relative_word_length = data.neutral_relative_word_lengths.tolist()
@@ -94,7 +116,7 @@ def process_data(data):
                 relative_word_length[i].extend([0]*(MAX_LEN-len(relative_word_length[i])))
             relative_word_length[i] = [float(x) if (float(x)<2.) else 2. for x in relative_word_length[i]]
 
-    return relative_word_length, emotions, text_vectors, text, emotions_vec
+    return relative_word_length, emotion_label, text_vectors, emotions_vec, person_vec
     
 
 class GetDataset(Dataset):
@@ -108,15 +130,16 @@ class GetDataset(Dataset):
             dataframe = dataframe[~dataframe.bucket]
         print("Len of data {}".format(len(dataframe)))
 
-        self.relative_word_lengths, self.emotions, self.pos_vecs, self.texts, self.emotions_vec = process_data(dataframe)
+        self.relative_word_lengths, self.emotions, self.pos_vecs, self.emotions_vec, self.person_vec = process_data(dataframe)
        
     def __getitem__(self, idx):
         relative_word_length = torch.tensor(self.relative_word_lengths[idx], dtype=torch.float32)
         pos_vec = torch.tensor(self.pos_vecs[idx])
         emotions_vec  = torch.tensor(self.emotions_vec[idx])
-        # print("INPUTS", relative_word_length.shape, emotions_vec.shape, pos_vec.shape)
-        
-        return relative_word_length, emotions_vec, pos_vec
+        people_vec = torch.tensor(self.person_vec[idx])
+        emotions_label = torch.tensor(self.emotions[idx])
+
+        return relative_word_length, emotions_label, emotions_vec, pos_vec, people_vec
         
     def __len__(self):
         return len(self.emotions)
