@@ -4,6 +4,12 @@ import pandas as pd
 import glob
 import numpy as np
 
+'''
+to run this code you will need to setup gentle aligner : https://github.com/lowerquality/gentle
+use updated align script, and gentle folder included in this repo
+to replace the one included in gentle aligner's original repo
+'''
+
 
 audioDirectory = '/localhome/ptuttosi/Documents/GAN/CREMA-D-master/AudioWAV/'
 alignerDirectory = '/localhome/ptuttosi/Documents/GAN/gentle/'
