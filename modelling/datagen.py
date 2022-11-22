@@ -4,7 +4,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-MAX_LEN = 8
+MAX_LEN = 7
 
 def read_csv(filename, seed=0.85):
     data = pd.read_csv(filename, sep=',').fillna(0)
@@ -35,8 +35,8 @@ def get_pos_vector(postag_lst):
 
     pos_vectors = []
     for i,postags in enumerate(postag_lst):
-        # if len(postags) < MAX_LEN:
-        #     postags.extend(['pad']*(MAX_LEN-len(postags)))
+        if len(postags) < MAX_LEN:
+            postags.extend(['pad']*(MAX_LEN-len(postags)))
         pos_vectors.append([pos_dict[k] for k in postags])
     
     return pos_vectors
@@ -60,6 +60,8 @@ def get_word_embeddings(text_lst):
 
     text_vectors = []
     for i, wordtags in enumerate(text_lst):
+        if len(wordtags) < MAX_LEN:
+            wordtags.extend(['pad']*(MAX_LEN-len(wordtags)))
         text_vectors.append([word_dict[k] for k in wordtags])
     return text_vectors
 
@@ -88,8 +90,8 @@ def process_data(data):
             relative_word_length[i] = [0]*base_word_lengths[i]
         else:
             relative_word_length[i] = relative_word_length[i][1:-1].replace(',','').split()
-            # if len(relative_word_length[i]) < MAX_LEN:
-            #     relative_word_length[i].extend([0]*(MAX_LEN-len(relative_word_length[i])))
+            if len(relative_word_length[i]) < MAX_LEN:
+                relative_word_length[i].extend([0]*(MAX_LEN-len(relative_word_length[i])))
             relative_word_length[i] = [float(x) if (float(x)<3.) else 3. for x in relative_word_length[i]]
 
     return relative_word_length, emotions, text_vectors, text, emotions_vec
@@ -110,9 +112,10 @@ class GetDataset(Dataset):
        
     def __getitem__(self, idx):
         relative_word_length = torch.tensor(self.relative_word_lengths[idx], dtype=torch.float32)
-        # emotion = torch.tensor(self.emotions[idx])
         pos_vec = torch.tensor(self.pos_vecs[idx])
         emotions_vec  = torch.tensor(self.emotions_vec[idx])
+        # print("INPUTS", relative_word_length.shape, emotions_vec.shape, pos_vec.shape)
+        
         return relative_word_length, emotions_vec, pos_vec
         
     def __len__(self):
