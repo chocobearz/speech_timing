@@ -54,7 +54,7 @@ for neutral_file in neutral_files:
     new_row['base_word_lengths'] = "NA"
     new_row['pause_lengths'] = "NA"
     neutral_row['base_word_lengths'] = "NA"
-    neutral_row['pause_lenghts'] = "NA"
+    neutral_row['pause_lengths'] = "NA"
   neutral_dataframe = pd.concat([neutral_dataframe, pd.Series(neutral_row).to_frame().T], ignore_index=True)
   dataframe = pd.concat([dataframe, pd.Series(new_row).to_frame().T], ignore_index=True)
 
