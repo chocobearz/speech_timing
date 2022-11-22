@@ -4,7 +4,9 @@ import spacy
 spacy.require_gpu()
 nlp = spacy.load("en_core_web_sm")
 
-processed_labelling = pd.read_csv('data/SentenceFilenames.csv')
+processed_labelling = pd.read_csv('./CREMA-D-master/SentenceFilenames.csv')
+audio_data = pd.read_csv('wordLength.csv')
+processed_labelling = pd.read_csv('./processed_data.csv')
 
 sentences = {
     "IEO": "It's eleven o'clock", 
@@ -30,6 +32,7 @@ emotion = {
     "SAD": "S"
 }
 
+# extract NLP features
 for key in sentences:
     doc = nlp(sentences[key]['script'])
     for token in doc:
@@ -74,4 +77,27 @@ labelling_data["end"] = end
 
 labelling_data["emotion"] = [emotion[key] for file in labelling_data['Filename'] for key in emotion if key in file]
 
-labelling_data.to_csv('scriptData.csv', index = False) 
+joined_df = pd.merge(pd.merge(audio_data, labelling_data, on = 'filename', how = 'inner'), processed_labelling, on = 'filename', how = 'inner')
+
+#drop rows with low rater agreement
+agreement_df = joined_df[joined_df['agreement'] > 0.666]
+
+#keep only audio labelled rows
+filtered_labelling_df = agreement_df[agreement_df['Unnamed: 0'] < 200000]
+filtered_labelling_df = filtered_labelling_df[[
+  'filename',
+  'base_word_lengths',
+  'pause_lengths',
+  'neutral_relative_word_lengths',
+  'script',
+  'emotion',
+  'pos',
+  'dep',
+  'lemma',
+  'tag',
+  'stop',
+  'start',
+  'end',
+]]
+
+filtered_labelling_df.to_csv('cleanData.csv', index = False) 
