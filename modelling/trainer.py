@@ -22,7 +22,7 @@ class emoTrainer:
         self.disc_word_len = disc_word_len
         self.emotion_proc = emotion_proc
         
-        run_name = 'GAN_class' + str(self.args.emo_dim) + '_lrg' + str(args.lr_g) + '_lrd' + str(args.lr_dsc) + '_b0.6' + '_BCE_ReconsGANLoss_AddNoise_std0.5_lowpower_PretrainDisc400_Pad_CFCN'
+        run_name = 'GAN_class' + str(self.args.emo_dim) + '_lrg' + str(args.lr_g) + '_lrd' + str(args.lr_dsc) + '_b0.6' + '_WassDis_Pad_Att_Clamp03'
         # run_name = '0'
         self.plotter = SummaryWriter('runs/' + run_name) 
         
@@ -73,9 +73,9 @@ class emoTrainer:
 
     def GAN_WasserteinLoss(self, logit, label):
         if label == 'real':
-            return -logit.mean()
-        if label == 'fake':
             return logit.mean()
+        if label == 'fake':
+            return -logit.mean()
 
     def step_disc_wordlen(self, data, epoch):
         self.disc_word_len.train()
@@ -85,13 +85,17 @@ class emoTrainer:
         # emo_proc = self.emotion_proc(emo_label)
         logit_fake = self.disc_word_len(emo_label, gen_relative_word_length)
         logit_real = self.disc_word_len(emo_label, relative_word_length)
-        loss_fake = self.GAN_BCELoss(logit_fake, 'fake')
-        loss_real = self.GAN_BCELoss(logit_real, 'real')
+        loss_fake = self.GAN_WasserteinLoss(logit_fake, 'fake')
+        loss_real = self.GAN_WasserteinLoss(logit_real, 'real')
         loss = loss_fake + loss_real
         loss.backward()
 
         torch.nn.utils.clip_grad_norm_(self.disc_word_len.parameters(), 1.)
         self.disc_word_len.module.opt.step()
+
+        with torch.no_grad():
+            for param in self.disc_word_len.parameters():
+                param.clamp_(-0.3, 0.3)
 
         # wdistance = -(loss_fake + loss_real).item()
         # self.loss_dict['df_wdistance'].append(wdistance)
@@ -109,20 +113,20 @@ class emoTrainer:
         gen_emotion, gen_relative_word_length  = self.generator(emo_label, pos_vec)
         
         df = self.disc_word_len.forward(emo_label, gen_relative_word_length)
-        gan_loss = self.GAN_BCELoss(df, 'real')
+        gan_loss = self.GAN_WasserteinLoss(df, 'fake')
 
         recon_loss = self.mse_loss(relative_word_length, gen_relative_word_length)
         sign_loss = self.sign_loss(relative_word_length, gen_relative_word_length)
         emo_loss = self.emo_loss(gen_emotion, torch.argmax(emo_label, dim=1))
         # print(sign_loss, emo_loss, recon_loss)
         
-        loss =  gan_loss + 5*recon_loss #+ 0.5*sign_loss # + 0.1*emo_loss
+        loss =  gan_loss + 2*recon_loss #+ 0.5*sign_loss # + 0.1*emo_loss
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.generator.parameters(), 1.)
         self.generator.module.opt.step()
 
         if np.random.random() > 0.995:
-            print(np.round(gen_relative_word_length[0,...].tolist(), 4), np.round(relative_word_length[0,...].tolist(), 4))
+            print(np.round(gen_relative_word_length[:2,...].tolist(), 4), np.round(relative_word_length[:2,...].tolist(), 4), flush=True)
 
         losslst = np.array([recon_loss.item(),  emo_loss.item(), sign_loss.item(), gan_loss.item(), loss.item()])
         return losslst
@@ -138,7 +142,7 @@ class emoTrainer:
                 relative_word_length, emotion, pos_vec = [d.float().to(self.args.device) for d in next(diterator)]
                 data = [relative_word_length, emotion, pos_vec]
                                 
-                if self.global_step%2 == 0:
+                if self.global_step%10 == 0:
                     gen_losses += self.step_generator(data)
                 else:
                     with torch.no_grad():
@@ -147,18 +151,18 @@ class emoTrainer:
                     dsc_losses += self.step_disc_wordlen(data, epoch)
                 self.global_step += 1
 
-            self.schdulerStep()
+            # self.schdulerStep()
 
             length = len(self.train_loader)
             self.plotter.add_scalar("lossgen/recons", gen_losses[0]/length, epoch)
-            self.plotter.add_scalar("lossgen/emo", gen_losses[1]/length, epoch)
-            self.plotter.add_scalar("lossgen/sign", gen_losses[2]/length, epoch)
-            self.plotter.add_scalar("lossgen/real", gen_losses[2]/length, epoch)
-            self.plotter.add_scalar("lossgen/", gen_losses[3]/length, epoch)
+            # self.plotter.add_scalar("lossgen/emo", gen_losses[1]/length, epoch)
+            # self.plotter.add_scalar("lossgen/sign", gen_losses[2]/length, epoch)
+            self.plotter.add_scalar("lossgen/real", gen_losses[3]/length, epoch)
+            self.plotter.add_scalar("lossgen/", gen_losses[4]/length, epoch)
             # self.plotter.add_scalar("learning_rate/", gen_losses[4], epoch)
 
-            self.plotter.add_scalar("lossdisc/real", dsc_losses[0]/length, epoch)
-            self.plotter.add_scalar("lossdisc/fake", dsc_losses[1]/length, epoch)
+            self.plotter.add_scalar("lossdisc/fake", dsc_losses[0]/length, epoch)
+            self.plotter.add_scalar("lossdisc/real", dsc_losses[1]/length, epoch)
             self.plotter.add_scalar("lossdisc/", dsc_losses[2]/length, epoch)
         
         self.displayLRs()

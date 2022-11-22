@@ -28,8 +28,8 @@ def initParams():
     parser.add_argument("-m", "--model", type=str, help="Pre-trained model path", default=None)
     parser.add_argument('--num_epochs', type=int, default=2000)
     parser.add_argument("--batch-size", type=int, default=32)
-    parser.add_argument('--lr_g', type=float, default=1e-05)
-    parser.add_argument('--lr_dsc', type=float, default=1e-05)
+    parser.add_argument('--lr_g', type=float, default=0.00005)
+    parser.add_argument('--lr_dsc', type=float, default=0.00005)
     parser.add_argument("--gpu-no", type=str, help="select gpu", default='0')
     parser.add_argument('--seed', type=int, default=9)
 
@@ -42,8 +42,8 @@ def initParams():
 
     args.batch_size = args.batch_size * max(int(torch.cuda.device_count()), 1)
     args.text_dim = 20
-    args.emo_dim = 3
-    args.noise_dim = args.text_dim + args.emo_dim
+    args.emo_dim = 4
+    args.noise_dim = args.text_dim
     args.steplr = 200
     args.filename = args.filename
     args.MAX_LEN = 7

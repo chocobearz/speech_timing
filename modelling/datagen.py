@@ -92,7 +92,7 @@ def process_data(data):
             relative_word_length[i] = relative_word_length[i][1:-1].replace(',','').split()
             if len(relative_word_length[i]) < MAX_LEN:
                 relative_word_length[i].extend([0]*(MAX_LEN-len(relative_word_length[i])))
-            relative_word_length[i] = [float(x) if (float(x)<3.) else 3. for x in relative_word_length[i]]
+            relative_word_length[i] = [float(x) if (float(x)<2.) else 2. for x in relative_word_length[i]]
 
     return relative_word_length, emotions, text_vectors, text, emotions_vec
     
