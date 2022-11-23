@@ -25,33 +25,31 @@ def initParams():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("-f", "--filename", type=str, help="Input folder containing train data", default='data/clean_data.csv')
     parser.add_argument("-o", "--out-path", type=str, help="output folder", default='outputs/')
-
     parser.add_argument("-m", "--model", type=str, help="Pre-trained model path", default=None)
- 
     parser.add_argument('--num_epochs', type=int, default=2000)
     parser.add_argument("--batch-size", type=int, default=1)
-
-    parser.add_argument('--lr_g', type=float, default=1e-03)
-    parser.add_argument('--lr_dsc', type=float, default=1e-07)
-
+    parser.add_argument('--lr_g', type=float, default=0.00005)
+    parser.add_argument('--lr_dsc', type=float, default=0.00005)
     parser.add_argument("--gpu-no", type=str, help="select gpu", default='0')
     parser.add_argument('--seed', type=int, default=9)
 
     parser.add_argument('--disc_word_len', type=float, default=1)
     parser.add_argument('--disc_emo', type=float, default=None)
-
     parser.add_argument('--pre_train', type=bool, default=False)
-
     args = parser.parse_args()
 
     # os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu_no
 
     args.batch_size = args.batch_size * max(int(torch.cuda.device_count()), 1)
     args.text_dim = 20
-    args.emo_dim = 3
-    args.noise_dim = 5
+    args.emo_dim = 6
+    args.noise_dim = args.text_dim
+    args.people_dim = 6
+
     args.steplr = 200
     args.filename = args.filename
+    args.MAX_LEN = 8
+    args.criterion = 'Wass'
 
     args.filters = [16, 32, 32, 32]
     #-----------------------------------------#
@@ -105,7 +103,7 @@ def train():
                                                **args.kwargs)
     val_loader = torch.utils.data.DataLoader(valDset,
                                                batch_size=4, 
-                                               shuffle=True,
+                                               shuffle=False,
                                                drop_last=True,
                                                **args.kwargs)
     device_ids = list(range(torch.cuda.device_count()))
@@ -114,6 +112,8 @@ def train():
     generator.apply(init_weights)
     generator = nn.DataParallel(generator, device_ids)
 
+    emotion_proc = models.EMOTIONPROCESSOR(args).to(args.device)
+    emotion_proc = nn.DataParallel(emotion_proc, device_ids)
 
     if args.disc_word_len:
         disc_word_len = models.DISCWORDLEN(args).to(args.device)
@@ -138,6 +138,7 @@ def train():
     
     emoTrainer = trainer.emoTrainer(args, 
                          generator=generator,
+                         emotion_proc=emotion_proc,
                          disc_word_len=disc_word_len,
                          train_loader=train_loader,
                          val_loader=val_loader)

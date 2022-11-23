@@ -4,12 +4,12 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-MAX_LEN = 8
+MAX_LEN = 0
 
 def read_csv(filename, seed=0.85):
     data = pd.read_csv(filename, sep=',').fillna(0)
     # data = data.dropna(subset=['base_word_lengths'])
-    data = data[data.emotion.isin(['A', 'N', 'D'])]
+    data = data[data.emotion.isin(['A', 'N', 'H'])]
 
     np.random.seed(10)
     samples = np.random.random_sample(len(data))
@@ -35,8 +35,8 @@ def get_pos_vector(postag_lst):
 
     pos_vectors = []
     for i,postags in enumerate(postag_lst):
-        # if len(postags) < MAX_LEN:
-        #     postags.extend(['pad']*(MAX_LEN-len(postags)))
+        if len(postags) < MAX_LEN:
+            postags.extend(['pad']*(MAX_LEN-len(postags)))
         pos_vectors.append([pos_dict[k] for k in postags])
     
     return pos_vectors
@@ -60,27 +60,53 @@ def get_word_embeddings(text_lst):
 
     text_vectors = []
     for i, wordtags in enumerate(text_lst):
+        if len(wordtags) < MAX_LEN:
+            wordtags.extend(['pad']*(MAX_LEN-len(wordtags)))
         text_vectors.append([word_dict[k] for k in wordtags])
     return text_vectors
 
 
+def get_people_vector(person_lst):
+    unique_people = set(person_lst)
+    nunique_people = len(unique_people)
+    print("Total number of unique people: ", nunique_people)
+
+    word_dict = dict()
+    i = 0
+    for p in unique_people:
+        x = [0]*(nunique_people+1)
+        x[i] = 1
+        i += 1
+        word_dict[p] = x
+    x = [0]*(nunique_people+1)
+
+    people_vectors = [word_dict[k] for k in person_lst]
+    return people_vectors
+
+
 def process_data(data):
+    data = data.sort_values('emotion')
     text = [x.split() for x in data.script]
     text_vectors = get_word_embeddings(text)
 
+    pos_seq = [x[1:-1].replace('\'','').replace(',','').split() for x in data.pos]
+    pos_vectors = get_pos_vector(pos_seq)
+
+    person_lst = [x.split('_')[0] for x in data.filename.tolist()]
+    person_vec = get_people_vector(person_lst)
+
+    # emotions vector
     emotions = data.emotion.tolist()
     # emotion_dict = {'A':0, 'D':1, 'F':2, 'H':3, 'N':4, 'S':5}
-    emotion_dict = {'A':0, 'D':1,'N':2}
+    emotion_dict = {'A':0, 'H':1,'N':2}
     emotions_vec = []
     for i in range(len(emotions)):
         x = [0]*len(emotion_dict)
         x[emotion_dict[emotions[i]]] = 1
         emotions_vec.append(x)
-    emotions = [emotion_dict[x] for x in emotions]
+    emotion_label = [emotion_dict[x] for x in emotions]
 
-    pos_seq = [x[1:-1].replace('\'','').replace(',','').split() for x in data.pos]
-    pos_vectors = get_pos_vector(pos_seq)
-    
+    # word lengths vector
     base_word_lengths = [len(x) for x in text]
     relative_word_length = data.neutral_relative_word_lengths.tolist()
     for i in range(len(emotions)):
@@ -88,11 +114,11 @@ def process_data(data):
             relative_word_length[i] = [0]*base_word_lengths[i]
         else:
             relative_word_length[i] = relative_word_length[i][1:-1].replace(',','').split()
-            # if len(relative_word_length[i]) < MAX_LEN:
-            #     relative_word_length[i].extend([0]*(MAX_LEN-len(relative_word_length[i])))
-            relative_word_length[i] = [float(x) if (float(x)<3.) else 3. for x in relative_word_length[i]]
+            if len(relative_word_length[i]) < MAX_LEN:
+                relative_word_length[i].extend([0]*(MAX_LEN-len(relative_word_length[i])))
+            relative_word_length[i] = [float(x) if (float(x)<2.) else 2. for x in relative_word_length[i]]
 
-    return relative_word_length, emotions, text_vectors, text, emotions_vec
+    return relative_word_length, emotion_label, text_vectors, emotions_vec, person_vec
     
 
 class GetDataset(Dataset):
@@ -106,14 +132,16 @@ class GetDataset(Dataset):
             dataframe = dataframe[~dataframe.bucket]
         print("Len of data {}".format(len(dataframe)))
 
-        self.relative_word_lengths, self.emotions, self.pos_vecs, self.texts, self.emotions_vec = process_data(dataframe)
+        self.relative_word_lengths, self.emotions, self.pos_vecs, self.emotions_vec, self.person_vec = process_data(dataframe)
        
     def __getitem__(self, idx):
         relative_word_length = torch.tensor(self.relative_word_lengths[idx], dtype=torch.float32)
-        # emotion = torch.tensor(self.emotions[idx])
         pos_vec = torch.tensor(self.pos_vecs[idx])
         emotions_vec  = torch.tensor(self.emotions_vec[idx])
-        return relative_word_length, emotions_vec, pos_vec
+        people_vec = torch.tensor(self.person_vec[idx])
+        emotions_label = torch.tensor(self.emotions[idx])
+
+        return relative_word_length, emotions_label, emotions_vec, pos_vec, people_vec
         
     def __len__(self):
         return len(self.emotions)
