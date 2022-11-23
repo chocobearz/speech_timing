@@ -4,12 +4,12 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-MAX_LEN = 7
+MAX_LEN = 0
 
 def read_csv(filename, seed=0.85):
     data = pd.read_csv(filename, sep=',').fillna(0)
     # data = data.dropna(subset=['base_word_lengths'])
-    data = data[data.emotion.isin(['A', 'N', 'D'])]
+    data = data[data.emotion.isin(['A', 'N', 'H'])]
 
     np.random.seed(10)
     samples = np.random.random_sample(len(data))
@@ -89,9 +89,16 @@ def process_data(data):
     text = [x.split() for x in data.script]
     text_vectors = get_word_embeddings(text)
 
+    pos_seq = [x[1:-1].replace('\'','').replace(',','').split() for x in data.pos]
+    pos_vectors = get_pos_vector(pos_seq)
+
+    person_lst = [x.split('_')[0] for x in data.filename.tolist()]
+    person_vec = get_people_vector(person_lst)
+
+    # emotions vector
     emotions = data.emotion.tolist()
     # emotion_dict = {'A':0, 'D':1, 'F':2, 'H':3, 'N':4, 'S':5}
-    emotion_dict = {'A':0, 'D':1,'N':2}
+    emotion_dict = {'A':0, 'H':1,'N':2}
     emotions_vec = []
     for i in range(len(emotions)):
         x = [0]*len(emotion_dict)
@@ -99,12 +106,7 @@ def process_data(data):
         emotions_vec.append(x)
     emotion_label = [emotion_dict[x] for x in emotions]
 
-    pos_seq = [x[1:-1].replace('\'','').replace(',','').split() for x in data.pos]
-    pos_vectors = get_pos_vector(pos_seq)
-
-    person_lst = [x.split('_')[0] for x in data.filename.tolist()]
-    person_vec = get_people_vector(person_lst)
-    
+    # word lengths vector
     base_word_lengths = [len(x) for x in text]
     relative_word_length = data.neutral_relative_word_lengths.tolist()
     for i in range(len(emotions)):

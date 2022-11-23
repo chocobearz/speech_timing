@@ -48,7 +48,7 @@ def initParams():
 
     args.steplr = 200
     args.filename = args.filename
-    args.MAX_LEN = 7
+    args.MAX_LEN = 8
     args.criterion = 'Wass'
 
     args.filters = [16, 32, 32, 32]
@@ -98,7 +98,7 @@ def train():
 
     train_loader = torch.utils.data.DataLoader(trainDset,
                                                batch_size=args.batch_size, 
-                                               shuffle=False,
+                                               shuffle=True,
                                                drop_last=True,
                                                **args.kwargs)
     val_loader = torch.utils.data.DataLoader(valDset,

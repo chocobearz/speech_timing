@@ -22,7 +22,7 @@ class emoTrainer:
         self.disc_word_len = disc_word_len
         self.emotion_proc = emotion_proc
         
-        run_name = 'GAN_class' + str(self.args.emo_dim) + '_lrg' + str(args.lr_g) + '_lrd' + str(args.lr_dsc) + '_Wass_Pad_Att_Clamp03_Noise10_1by7_Pretrain100_reconsMeanVar_People'
+        run_name = 'GAN_class' + str(self.args.emo_dim) + '_lrg' + str(args.lr_g) + '_lrd' + str(args.lr_dsc) + '_Wass_NOPad_Att_Clamp03_Noise10_1by7_Pretrain100_reconsMeanVar_Text_ADH'
         # run_name = '0'
         self.plotter = SummaryWriter('runs/' + run_name) 
         
@@ -91,7 +91,7 @@ class emoTrainer:
         gen_relative_word_length, relative_word_length, gen_emo, emo_label = data
         self.disc_word_len.module.opt.zero_grad()
         
-        # emo_proc = self.emotion_proc(emo_label)
+        # print(gen_relative_word_length.shape, relative_word_length.shape)
         logit_fake = self.disc_word_len(emo_label, gen_relative_word_length)
         logit_real = self.disc_word_len(emo_label, relative_word_length)
         loss_fake = self.criterion(logit_fake, 'fake')
@@ -128,18 +128,19 @@ class emoTrainer:
         self.generator.module.opt.zero_grad()
         gen_emotion, gen_relative_word_length  = self.generator(emotions_vec, pos_vec, people_vec)
         
+        # print(gen_relative_word_length.shape, relative_word_length.shape)
         df = self.disc_word_len.forward(emotions_vec, gen_relative_word_length)
         gan_loss = self.criterion(df, 'fake')
 
-        # recon_loss = self.mse_loss(relative_word_length, gen_relative_word_length)
+        recon_loss = self.mse_loss(relative_word_length, gen_relative_word_length)
         recon_mean_loss = self.mse_loss(relative_word_length.mean(dim=1), gen_relative_word_length.mean(dim=1))
         recon_var_loss = self.mse_loss(relative_word_length.var(dim=1), gen_relative_word_length.var(dim=1))
-        recon_loss = recon_mean_loss + recon_var_loss
+        recon_loss = recon_mean_loss + recon_var_loss + 0.5*recon_loss
 
         sign_loss = self.sign_loss(relative_word_length, gen_relative_word_length)
         # emo_loss = self.emo_loss(gen_emotion, emo_label)
         
-        loss =  gan_loss + 2*recon_loss #+ 0.5*sign_loss # + 0.1*emo_loss
+        loss =  gan_loss + recon_loss #+ 0.5*sign_loss # + 0.1*emo_loss
         loss.backward()
         torch.nn.utils.clip_grad_norm_(self.generator.parameters(), 1.)
         self.generator.module.opt.step()

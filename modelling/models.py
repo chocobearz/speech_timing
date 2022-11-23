@@ -62,11 +62,13 @@ class TEXTENCODER(nn.Module):
     def __init__(self, args, bnorm=True):
         super(TEXTENCODER, self).__init__() 
         self.args = args
-        self.fc_0 = nn.Sequential(nn.Linear(54, 16),
+
+        in_dim = 54
+        self.fc_0 = nn.Sequential(nn.Linear(in_dim, 16),
                         nn.Tanh())
         self.lstm = nn.LSTM(input_size=16, hidden_size=self.args.text_dim, num_layers=2, bidirectional=True, batch_first=True)
-        self.FCN = nn.Sequential(nn.Linear(16, self.args.text_dim),
-                                nn.BatchNorm1d(num_features=7),
+        self.FCN = nn.Sequential(nn.Linear(self.args.text_dim*2, self.args.text_dim),
+                                # nn.BatchNorm1d(num_features=7),
                                 nn.Tanh())
 
         self.conv = nn.Sequential(nn.Conv2d(in_channels=1, out_channels=3, kernel_size=3, stride=1, padding=1),
@@ -74,8 +76,8 @@ class TEXTENCODER(nn.Module):
                                   nn.Conv2d(in_channels=3, out_channels=1, kernel_size=3, stride=1, padding=1))
         self.leakyrelu = nn.LeakyReLU(0.2)
         
-        self.multihead_attn = nn.MultiheadAttention(embed_dim=54, num_heads=9)
-        self.fc_1 = nn.Sequential(nn.Linear(54, 16))
+        # self.multihead_attn = nn.MultiheadAttention(embed_dim=in_dim, num_heads=9)
+        self.fc_1 = nn.Sequential(nn.Linear(in_dim, 16))
 
     def forward(self, x):
         # Q = K = V = x 
@@ -83,7 +85,7 @@ class TEXTENCODER(nn.Module):
         # # print(attn_output.shape, x.shape)
         # out = self.fc_1(attn_output)
         x = self.fc_0(x)
-        # x, _ = self.lstm(x)
+        x, _ = self.lstm(x)
         # x = x.unsqueeze(dim=1)
         # x = self.conv(x).squeeze(dim=1)
         out = self.FCN(x)
@@ -151,7 +153,7 @@ class DECODER(nn.Module):
             nn.LeakyReLU(0.2),
         )
 
-        self.lstm_1 = nn.LSTM(input_size=self.args.text_dim*3+self.args.emo_dim, 
+        self.lstm_1 = nn.LSTM(input_size=self.args.text_dim+self.args.emo_dim+self.args.people_dim+self.args.noise_dim//2, 
                               hidden_size=self.args.filters[0], num_layers=2, batch_first=True)
         self.lstm_2 = nn.Sequential(nn.Tanh(),
                                   nn.LSTM(input_size=self.args.filters[0], hidden_size=1, num_layers=1, batch_first=True))
@@ -161,14 +163,11 @@ class DECODER(nn.Module):
                                  nn.Tanh(),
                                  nn.Linear(self.args.MAX_LEN, 1))
         
-        in_dim = 42
+        in_dim = self.args.text_dim+self.args.emo_dim+self.args.people_dim+self.args.noise_dim//2
         self.emo_classifier = nn.Sequential(
             nn.Linear(in_dim, self.args.emo_dim),
-            # nn.Linear(self.args.text_dim*3+self.args.emo_dim, self.args.emo_dim),
             nn.LeakyReLU(0.2),
-            nn.Flatten(),
-            nn.Linear(self.args.emo_dim*self.args.MAX_LEN, self.args.emo_dim),
-            nn.LeakyReLU(0.2)
+            nn.Flatten()
         )
         self.tanh = nn.Tanh()
 
@@ -177,18 +176,17 @@ class DECODER(nn.Module):
                                 nn.Tanh())
         
     def forward(self, encodings_vec):
-        # h, _ = self.lstm_1(encodings_vec)
-        # gen_word_len, _ = self.lstm_2(h)
-        # gen_word_len = self.tanh(gen_word_len).squeeze(dim=2)
+        h, _ = self.lstm_1(encodings_vec)
+        gen_word_len, _ = self.lstm_2(h)
+        gen_word_len = self.tanh(gen_word_len).squeeze(dim=2)
 
         # encodings_vec = encodings_vec.unsqueeze(dim=1)
         # encodings_vec = self.conv(encodings_vec).squeeze(dim=1)
-
         # gen_word_len = self.FCN(encodings_vec).squeeze(dim=-1)
 
-        Q = K = V = encodings_vec
-        gen_word_len, _ = self.multihead_attn(Q, K, V)
-        gen_word_len = self.fc_1(gen_word_len).squeeze(dim=-1)
+        # Q = K = V = encodings_vec
+        # gen_word_len, _ = self.multihead_attn(Q, K, V)
+        # gen_word_len = self.fc_1(gen_word_len).squeeze(dim=-1)
 
         gen_emotion = self.emo_classifier(encodings_vec)
         return gen_emotion, gen_word_len
@@ -245,11 +243,11 @@ class DISCWORDLEN(nn.Module):
             nn.LeakyReLU(0.2)
         )
         self.fc_2 = nn.Sequential(
-            nn.Linear(7+2, 1),
+            nn.Linear(4+2, 1),
         )
         if args.criterion == 'BCE':
             self.fc_2 = nn.Sequential(
-            nn.Linear(7+2, 1),
+            nn.Linear(4+2, 1),
             nn.Sigmoid()
         )
         # self.opt = optim.Adam(list(self.parameters()), lr = self.args.lr_dsc, betas=(0.5, 0.9))
@@ -257,13 +255,10 @@ class DISCWORDLEN(nn.Module):
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.opt, self.args.steplr, gamma=0.6, last_epoch=-1) 
     
     def forward(self, emotion, relative_word_length):
-        # features = torch.tensor([torch.std(relative_word_length, dim=1), torch.max(relative_word_length, dim=1), torch.min(relative_word_length, dim=1), torch.mean(relative_word_length, dim=1)])
-        # features = features.unsqueeze(dim=0)
-        
+        features = torch.tensor([torch.std(relative_word_length, dim=1), torch.max(relative_word_length, dim=1).values, torch.min(relative_word_length, dim=1).values, torch.mean(relative_word_length, dim=1)])
+        features = features.unsqueeze(dim=0)
         emotion = self.fc_1(emotion)
-        h_ = torch.cat((emotion, relative_word_length), 1)
-        # print(emotion.shape, relative_word_length.shape, h_.shape)
-
+        h_ = torch.cat((emotion, features), 1)
         h = self.fc_2(h_)
         return h
     
