@@ -1,0 +1,18 @@
+<speak 
+  xmlns="http://www.w3.org/2001/10/synthesis" 
+  xmlns:mstts="http://www.w3.org/2001/mstts" 
+  xmlns:emo="http://www.w3.org/2009/10/emotionml" 
+  version="1.0" xml:lang="en-US"
+>
+  <voice name="en-US-JennyNeural">
+    <mstts:express-as style=EMOTION >
+      <prosody rate=RATE0> I </prosody>
+      <prosody rate=RATE1> would </prosody>
+      <prosody rate=RATE2> like </prosody>
+      <prosody rate=RATE3> a </prosody>
+      <prosody rate=RATE4> new </prosody>
+      <prosody rate=RATE5> alarm </prosody>
+      <prosody rate=RATE6> clock </prosody>
+    </mstts:express-as>
+  </voice>
+</speak>

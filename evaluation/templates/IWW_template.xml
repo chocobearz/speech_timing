@@ -1,0 +1,17 @@
+<speak 
+  xmlns="http://www.w3.org/2001/10/synthesis" 
+  xmlns:mstts="http://www.w3.org/2001/mstts" 
+  xmlns:emo="http://www.w3.org/2009/10/emotionml" 
+  version="1.0" xml:lang="en-US"
+>
+  <voice name="en-US-JennyNeural">
+    <mstts:express-as style=EMOTION >
+      <prosody rate=RATE0> I </prosody>
+      <prosody rate=RATE1> wonder </prosody>
+      <prosody rate=RATE2> what </prosody>
+      <prosody rate=RATE3> this </prosody>
+      <prosody rate=RATE4> is </prosody>
+      <prosody rate=RATE5> about </prosody>
+    </mstts:express-as>
+  </voice>
+</speak>
