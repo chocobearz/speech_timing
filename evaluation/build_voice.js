@@ -80,11 +80,13 @@ for (key in Object.keys(word_lengths)) {
     const script_tag = scripts[script];
     let ssml = ""
 
+    // if you have a tamplate tag
     if (wordLengthFile.length === 2){
       if (wordLengthFile[1] === "template") {
         const synth_template = `./templates/${script_tag}_template.xml`;
         ssml = xmlToString(synth_template);
-  
+
+        // fill template word lengths
         lengths.forEach((length, i) => {
           length = length*100;
           ssml = ssml.replace(`RATE${i}`, `"${length}%"`);
@@ -94,9 +96,11 @@ for (key in Object.keys(word_lengths)) {
         process.exit();
       }
     } else {
+      // base with no word lengths  
       const synth_template = `./templates/azure_base/${script_tag}.xml`;
       ssml = xmlToString(synth_template);
     }
+    // fill emotion tag template
     const path = wordLengthFile[0].split("/");
     const file = path.slice(-1)
     const emotion_code = emotions[file[0][0]]
@@ -104,5 +108,6 @@ for (key in Object.keys(word_lengths)) {
 
     console.log(ssml)
     const out_file = `${base_path}/audio/${emotion_code}_${script_tag}.wav`
+    //generate audio
     synthesizeSpeech(ssml, out_file)
 }
