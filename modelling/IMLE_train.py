@@ -1,6 +1,5 @@
 import argparse
 import json
-import math
 import os
 import random as rn
 import shutil
@@ -8,7 +7,6 @@ import shutil
 import numpy as np 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 import models
 from datagen import *
@@ -18,8 +16,8 @@ def initParams():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("-f", "--filename", type=str, help="Input folder containing train data", default='../data/clean_data.csv')
     parser.add_argument("-o", "--out-path", type=str, help="output folder", default='outputs/')
-    parser.add_argument("-m", "--model", type=str, help="Pre-trained model path", default=None)
-    parser.add_argument('--num_epochs', type=int, default=1000)
+    parser.add_argument("-m", "--model", type=str, help="Pre-trained model path", default='checkpoints/')
+    parser.add_argument('--num_epochs', type=int, default=100)
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument('--lr_g', type=float, default=0.0005)
     parser.add_argument('--lr_dsc', type=float, default=0.0005)
@@ -35,7 +33,7 @@ def initParams():
 
     args.batch_size = args.batch_size * max(int(torch.cuda.device_count()), 1)
     args.text_dim = 20
-    args.emo_dim = 6
+    args.emo_dim = 3
     args.noise_dim = args.text_dim
     args.people_dim = 6
 
@@ -44,7 +42,7 @@ def initParams():
     args.MAX_LEN = 0
     args.criterion = 'Wass'
 
-    args.filters = [16, 32, 32, 32]
+    args.filters = [8, 16, 16, 16]
     #-----------------------------------------#
     #           Reproducible results          #
     #-----------------------------------------#
@@ -56,15 +54,9 @@ def initParams():
    
     if not os.path.exists(args.out_path):
         os.makedirs(args.out_path)
-    else:
-        shutil.rmtree(args.out_path)
-        os.mkdir(args.out_path)
 
     if not os.path.exists(os.path.join(args.out_path, 'inter')):
         os.makedirs(os.path.join(args.out_path, 'inter'))
-    else:
-        shutil.rmtree(os.path.join(args.out_path, 'inter'))
-        os.mkdir(os.path.join(args.out_path, 'inter'))
 
     with open(os.path.join(args.out_path, 'args.txt'), 'w') as f:
         json.dump(args.__dict__, f, indent=2)
@@ -82,57 +74,6 @@ def init_weights(m):
 def enableGrad(model, requires_grad):
     for p in model.parameters():
         p.requires_grad_(requires_grad)
-
-def train():
-    args = initParams()
-    
-    trainDset = GetDataset(args.filename)
-    valDset = GetDataset(args.filename, val=True)
-
-    train_loader = torch.utils.data.DataLoader(trainDset,
-                                               batch_size=args.batch_size, 
-                                               shuffle=True,
-                                               drop_last=True,
-                                               **args.kwargs)
-    val_loader = torch.utils.data.DataLoader(valDset,
-                                               batch_size=args.batch_size,
-                                               shuffle=False,
-                                               drop_last=True,
-                                               **args.kwargs)
-    device_ids = list(range(torch.cuda.device_count()))
-
-    generator = models.GENERATOR(args).to(args.device)
-    generator.apply(init_weights)
-    generator = nn.DataParallel(generator, device_ids)
-
-    emotion_proc = models.EMOTIONPROCESSOR(args).to(args.device)
-    emotion_proc = nn.DataParallel(emotion_proc, device_ids)
-
-    if args.disc_word_len:
-        disc_word_len = models.DISCWORDLEN(args).to(args.device)
-        disc_word_len.apply(init_weights)
-        disc_word_len = nn.DataParallel(disc_word_len, device_ids)
-    else:
-        disc_word_len = None
-
-    # if args.model:
-    #     generator.load_state_dict(torch.load(os.path.join(args.model, 'generator.pt'), map_location="cuda" if args.cuda else "cpu"), strict=True)
-    #     print('Generator loaded...')
-    # if args.disc_word_len:
-    #     disc_word_len.load_state_dict(torch.load(os.path.join(args.model_disc_frame, 'disc_frame.pt'), map_location="cuda" if args.cuda else "cpu"), strict=True)
-    #     print('Disc frame loaded...')
-    
-    emoTrainer = GAN_trainer.emoTrainer(args, 
-                         generator=generator,
-                         emotion_proc=emotion_proc,
-                         disc_word_len=disc_word_len,
-                         train_loader=train_loader,
-                         val_loader=val_loader)
-    
-    if args.pre_train:
-        emoTrainer.pre_train()
-    else:
-        emoTrainer.train()
 
 
 def imle_train():
@@ -161,25 +102,27 @@ def imle_train():
     autoencoder.apply(init_weights)
     autoencoder = nn.DataParallel(autoencoder, device_ids)
 
-    # if args.model:
-    #     generator.load_state_dict(torch.load(os.path.join(args.model, 'generator.pt'), map_location="cuda" if args.cuda else "cpu"), strict=True)
-    #     print('Generator loaded...')
-    # if args.disc_word_len:
-    #     disc_word_len.load_state_dict(torch.load(os.path.join(args.model_disc_frame, 'disc_frame.pt'), map_location="cuda" if args.cuda else "cpu"), strict=True)
-    #     print('Disc frame loaded...')
-    
+    if not args.pre_train:
+        autoencoder.load_state_dict(torch.load(os.path.join(args.model, 'autoencoder.pt'), map_location="cuda" if args.cuda else "cpu"), strict=True)
+        print('Autoencoder loaded...')
+        imle = models.IMLE(args, autoencoder).to(args.device)
+        imle = nn.DataParallel(imle, device_ids)   
+    else:
+        imle = None
+
     emoTrainer = IMLE_trainer.emoTrainer(args, 
-                         generator=generator,
                          autoencoder=autoencoder,
-                        #  decoder=decoder,
+                         imle=imle,
                          train_loader=train_loader,
                          val_loader=val_loader)
     
     if args.pre_train:
         emoTrainer.pre_train()
     else:
+        # emoTrainer.collect_variance()
         emoTrainer.train()
-
+    
+    emoTrainer.test()
 
 
 if __name__ == "__main__":
