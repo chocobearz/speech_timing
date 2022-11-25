@@ -9,7 +9,7 @@ MAX_LEN = 0
 def read_csv(filename, seed=0.9):
     data = pd.read_csv(filename, sep=',').fillna(0)
     # data = data.dropna(subset=['base_word_lengths'])
-    data = data[data.emotion.isin(['A', 'F', 'H'])]
+    data = data[data.emotion.isin(['A', 'N', 'H'])]
     return data
 
 
@@ -91,7 +91,7 @@ def process_data(data):
     # emotions vector
     emotions = data.emotion.tolist()
     # emotion_dict = {'A':0, 'D':1, 'F':2, 'H':3, 'N':4, 'S':5}
-    emotion_dict = {'A':0, 'H':1, 'F':2}
+    emotion_dict = {'A':0, 'H':1, 'N':2}
     emotions_vec = []
     for i in range(len(emotions)):
         x = [0]*len(emotion_dict)
