@@ -21,8 +21,8 @@ def initParams():
     parser.add_argument("-m", "--model", type=str, help="Pre-trained model path", default=None)
     parser.add_argument('--num_epochs', type=int, default=1000)
     parser.add_argument("--batch-size", type=int, default=1)
-    parser.add_argument('--lr_g', type=float, default=0.0005)
-    parser.add_argument('--lr_dsc', type=float, default=0.0005)
+    parser.add_argument('--lr_g', type=float, default=0.00005)
+    parser.add_argument('--lr_dsc', type=float, default=0.00005)
     parser.add_argument("--gpu-no", type=str, help="select gpu", default='0')
     parser.add_argument('--seed', type=int, default=9)
 
@@ -183,6 +183,6 @@ def imle_train():
 
 
 if __name__ == "__main__":
-    #train()
+    train()
     
-    imle_train()
+    # imle_train()

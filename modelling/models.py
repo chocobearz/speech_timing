@@ -67,7 +67,7 @@ class TEXTENCODER(nn.Module):
         in_dim = 54
         self.fc_0 = nn.Sequential(nn.Linear(in_dim, 16),
                         nn.Tanh())
-        self.lstm = nn.LSTM(input_size=16, hidden_size=self.args.text_dim, num_layers=2, bidirectional=True, batch_first=True)
+        self.lstm = nn.LSTM(input_size=16, hidden_size=self.args.text_dim, num_layers=1, bidirectional=True, batch_first=True)
         self.FCN = nn.Sequential(nn.Linear(self.args.text_dim*2, self.args.text_dim),
                                 nn.Tanh())
         self.fc_1 = nn.Sequential(nn.Linear(in_dim, 16))
@@ -146,12 +146,12 @@ class DECODER(nn.Module):
             nn.LeakyReLU(0.2),
         )
 
-        self.lstm_1 = nn.LSTM(input_size=self.args.text_dim+self.args.emo_dim+self.args.people_dim+self.args.noise_dim//2, 
-                              hidden_size=self.args.filters[0], num_layers=2, batch_first=True)
+        self.lstm_1 = nn.LSTM(input_size=self.args.text_dim+self.args.emo_dim+self.args.people_dim, 
+                              hidden_size=self.args.filters[0], num_layers=1, batch_first=True)
         self.lstm_2 = nn.Sequential(nn.Tanh(),
                                   nn.LSTM(input_size=self.args.filters[0], hidden_size=1, num_layers=1, batch_first=True))
 
-        in_dim = self.args.text_dim+self.args.emo_dim+self.args.people_dim+self.args.noise_dim//2
+        in_dim = self.args.text_dim+self.args.emo_dim+self.args.people_dim
         self.emo_classifier = nn.Sequential(
             nn.Linear(in_dim, self.args.emo_dim),
             nn.LeakyReLU(0.2),
@@ -185,7 +185,6 @@ class GENERATOR(nn.Module):
 
         # self.opt = optim.Adam(list(self.parameters()), lr = self.args.lr_g, betas=(0.5, 0.9))
         self.opt = optim.RMSprop(list(self.parameters()), lr = self.args.lr_g)
-
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.opt, self.args.steplr, gamma=0.6, last_epoch=-1)
 
     def forward(self, emotion, pos_vec, people_vec):
@@ -199,10 +198,10 @@ class GENERATOR(nn.Module):
         z_noise = self.noise_generator(z)
 
         # Concatenate noise
-        z = torch.cat((z, z_noise), 2)
+        # z = torch.cat((z, z_noise), 2)
 
         # Add noise
-        # z += z_noise
+        z += z_noise
         
         gen_emotion, gen_word_len = self.decoder(z)
         # print("gen_word_len", gen_word_len.shape)
@@ -249,16 +248,15 @@ class DISCWORDLEN(nn.Module):
         
         # Interpolation between real data and fake data.
         interpolation = eps * real_data + (1 - eps) * fake_data
-        interpolation.requires_grad_(True)
+        interpolation =  Variable(interpolation, requires_grad=True)
         # get logits for interpolated images
         interp_logits = self.forward(emotion, interpolation)
-        grad_outputs = torch.ones_like(interp_logits)
         
         # Compute Gradients
         gradients = autograd.grad(
             outputs=interp_logits,
             inputs=interpolation,
-            grad_outputs=grad_outputs,
+            grad_outputs=torch.ones_like(interp_logits),
             create_graph=True,
             retain_graph=True
         )[0]
