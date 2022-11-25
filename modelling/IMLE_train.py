@@ -17,7 +17,7 @@ def initParams():
     parser.add_argument("-f", "--filename", type=str, help="Input folder containing train data", default='../data/clean_data.csv')
     parser.add_argument("-o", "--out-path", type=str, help="output folder", default='outputs/')
     parser.add_argument("-m", "--model", type=str, help="Pre-trained model path", default='checkpoints/')
-    parser.add_argument('--num_epochs', type=int, default=100)
+    parser.add_argument('--num_epochs', type=int, default=1000)
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument('--lr_g', type=float, default=0.0005)
     parser.add_argument('--lr_dsc', type=float, default=0.0005)
@@ -107,14 +107,14 @@ def imle_train():
         print('Autoencoder loaded...')
         imle = models.IMLE(args, autoencoder).to(args.device)
         imle = nn.DataParallel(imle, device_ids)   
-        checkpoint = torch.load(os.path.join(args.model, 'imle.pt'), map_location="cuda" if args.cuda else "cpu")
-        sd = autoencoder.state_dict()
-        for k in imle.state_dict().keys():
-            if k in sd and sd[k].size() == checkpoint[k].size():
-                sd[k] = checkpoint[k]
-            else:
-                print("Missed: ", k)
-        autoencoder.load_state_dict(sd)
+        # checkpoint = torch.load(os.path.join(args.model, 'imle.pt'), map_location="cuda" if args.cuda else "cpu")
+        # sd = autoencoder.state_dict()
+        # for k in imle.state_dict().keys():
+        #     if k in sd and sd[k].size() == checkpoint[k].size():
+        #         sd[k] = checkpoint[k]
+        #     else:
+        #         print("Missed: ", k)
+        # autoencoder.load_state_dict(sd)
     else:
         imle = None
 

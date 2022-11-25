@@ -21,7 +21,7 @@ class emoTrainer:
         self.imle = imle
         
         self.run_name = 'IMLE_run_var_08'
-        self.plotter = SummaryWriter('runs/' + self.run_name) 
+        self.plotter = SummaryWriter('runs_imle/' + self.run_name) 
         
         self.L2loss = torch.nn.MSELoss(reduction='mean')
         self.L1loss = torch.nn.L1Loss(reduction='mean')
@@ -148,7 +148,7 @@ class emoTrainer:
             z = self.imle.module.encode(emotions_vec, pos_vec, people_vec)
             encoded_vecs.append(z.std())
         encoded_vecs = torch.stack(encoded_vecs)
-        print(encoded_vecs.mean(), encoded_vecs.var())
+        print(encoded_vecs.mean(), encoded_vecs.std())
 
         
     def train(self):
@@ -179,16 +179,16 @@ class emoTrainer:
         
     def test(self):
         diterator = iter(self.val_loader)
-        out_file = os.path.join(self.args.out_path, self.run_name + '_3samples_test.txt')
+        out_file = os.path.join(self.args.out_path, self.run_name + '_2samples_test.txt')
         with open(out_file, 'w') as f:
             for _ in range(len(self.val_loader)):  
-                relative_word_length, emotion_label, emotions_vec, pos_vec, people_vec, script = [d for d in next(diterator)]
+                relative_word_length, emotion_label, emotions_vec, pos_vec, people_vec = [d for d in next(diterator)]
                 self.imle.eval()
                 with torch.no_grad():
-                    for _ in range(3):
+                    for _ in range(2):
                         z = self.imle.module.encode(emotions_vec.float(), pos_vec.float(), people_vec.float())
                         gen_relative_word_length = self.imle.module.get_single_latent_code(z, [z.shape[1], z.shape[2]])
-                        f.write('\t'.join([str(emotion_label.item()), script[0],
+                        f.write('\t'.join([str(emotion_label.item()),
                                         str(relative_word_length.tolist()[0]),
                                         str(gen_relative_word_length.tolist()[0])])+'\n')
         f.close()

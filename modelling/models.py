@@ -146,7 +146,7 @@ class DECODER(nn.Module):
             nn.LeakyReLU(0.2),
         )
 
-        self.lstm_1 = nn.LSTM(input_size=self.args.text_dim+self.args.emo_dim+self.args.people_dim, 
+        self.lstm_1 = nn.LSTM(input_size=self.args.text_dim+self.args.emo_dim +self.args.people_dim, 
                               hidden_size=self.args.filters[0], num_layers=1, batch_first=True)
         self.lstm_2 = nn.Sequential(nn.Tanh(),
                                   nn.LSTM(input_size=self.args.filters[0], hidden_size=1, num_layers=1, batch_first=True))
@@ -194,6 +194,7 @@ class GENERATOR(nn.Module):
         z_people = self.people_processor(people_vec)
         z_people = z_people.unsqueeze(1).repeat(1, z_text.size(1), 1)
 
+        # z = torch.cat((z_text, z_emo), 2)
         z = torch.cat((z_text, z_emo, z_people), 2)
         z_noise = self.noise_generator(z)
 

@@ -19,10 +19,10 @@ def initParams():
     parser.add_argument("-f", "--filename", type=str, help="Input folder containing train data", default='../data/clean_data.csv')
     parser.add_argument("-o", "--out-path", type=str, help="output folder", default='outputs/')
     parser.add_argument("-m", "--model", type=str, help="Pre-trained model path", default=None)
-    parser.add_argument('--num_epochs', type=int, default=1000)
+    parser.add_argument('--num_epochs', type=int, default=4000)
     parser.add_argument("--batch-size", type=int, default=1)
-    parser.add_argument('--lr_g', type=float, default=0.00005)
-    parser.add_argument('--lr_dsc', type=float, default=0.00005)
+    parser.add_argument('--lr_g', type=float, default=0.0001)
+    parser.add_argument('--lr_dsc', type=float, default=0.0001)
     parser.add_argument("--gpu-no", type=str, help="select gpu", default='0')
     parser.add_argument('--seed', type=int, default=9)
 
@@ -56,16 +56,10 @@ def initParams():
    
     if not os.path.exists(args.out_path):
         os.makedirs(args.out_path)
-    else:
-        shutil.rmtree(args.out_path)
-        os.mkdir(args.out_path)
-
+   
     if not os.path.exists(os.path.join(args.out_path, 'inter')):
         os.makedirs(os.path.join(args.out_path, 'inter'))
-    else:
-        shutil.rmtree(os.path.join(args.out_path, 'inter'))
-        os.mkdir(os.path.join(args.out_path, 'inter'))
-
+    
     with open(os.path.join(args.out_path, 'args.txt'), 'w') as f:
         json.dump(args.__dict__, f, indent=2)
 
@@ -174,11 +168,11 @@ def imle_train():
                         #  decoder=decoder,
                          train_loader=train_loader,
                          val_loader=val_loader)
-    
-    if args.pre_train:
-        emoTrainer.pre_train()
-    else:
-        emoTrainer.train()
+
+    # if args.pre_train:
+    #     emoTrainer.pre_train()
+    # else:
+    #     emoTrainer.train()
 
 
 
