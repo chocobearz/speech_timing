@@ -107,6 +107,14 @@ def imle_train():
         print('Autoencoder loaded...')
         imle = models.IMLE(args, autoencoder).to(args.device)
         imle = nn.DataParallel(imle, device_ids)   
+        checkpoint = torch.load(os.path.join(args.model, 'imle.pt'), map_location="cuda" if args.cuda else "cpu")
+        sd = autoencoder.state_dict()
+        for k in imle.state_dict().keys():
+            if k in sd and sd[k].size() == checkpoint[k].size():
+                sd[k] = checkpoint[k]
+            else:
+                print("Missed: ", k)
+        autoencoder.load_state_dict(sd)
     else:
         imle = None
 
@@ -116,10 +124,12 @@ def imle_train():
                          train_loader=train_loader,
                          val_loader=val_loader)
     
+    emoTrainer.collect_variance()
+
     if args.pre_train:
         emoTrainer.pre_train()
     else:
-        # emoTrainer.collect_variance()
+        emoTrainer.collect_variance()
         emoTrainer.train()
     
     emoTrainer.test()

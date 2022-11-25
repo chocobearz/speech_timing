@@ -22,7 +22,7 @@ class emoTrainer:
         self.disc_word_len = disc_word_len
         self.emotion_proc = emotion_proc
         
-        # self.run_name = 'GAN_class' + str(self.args.emo_dim) + '_lrg' + str(args.lr_g) + '_lrd' + str(args.lr_dsc) + '_Wass_NOPad_Att_Clamp03_Noise10_1by7_Pretrain100_Text_ADH'
+        self.run_name = 'GAN_class' + str(self.args.emo_dim) + '_lrg' + str(args.lr_g) + '_lrd' + str(args.lr_dsc) + '_WassFIX_NOPad_Att_Clamp03_Noise10_1by7_Pretrain100_Text_ADH'
         self.run_name = '0' #GAN_class' + str(self.args.emo_dim) + '_lrg' + str(args.lr_g) + '_lrd' + str(args.lr_dsc) + '_Wass_NOPad_Att_Clamp03_Noise10_1by7_Pretrain100_reconsMeanVar_Text_ADH'
         self.plotter = SummaryWriter('runs/' + self.run_name) 
         
@@ -94,8 +94,11 @@ class emoTrainer:
         # print(gen_relative_word_length.shape, relative_word_length.shape)
         logit_fake = self.disc_word_len(emo_label, gen_relative_word_length)
         logit_real = self.disc_word_len(emo_label, relative_word_length)
-        loss_fake = self.criterion(logit_fake, 'fake')
-        loss_real = self.criterion(logit_real, 'real')
+        # loss_fake = self.criterion(logit_fake, 'fake')
+        # loss_real = self.criterion(logit_real, 'real')
+
+        loss_fake = torch.mean(logit_fake)
+        loss_real = -torch.mean(logit_real)
         loss = loss_fake + loss_real
 
         torch.nn.utils.clip_grad_norm_(self.disc_word_len.parameters(), 1.)
@@ -107,11 +110,10 @@ class emoTrainer:
             # Clip the gradients
             with torch.no_grad():
                 for param in self.disc_word_len.parameters():
-                    param.clamp_(-0.3, 0.3)
+                    param.clamp_(-0.01, 0.01)
             # # Gradient penalty
             # gradpenalty = self.disc_word_len.module.compute_gp(gen_relative_word_length, relative_word_length, emo_label)
             # loss += 5*gradpenalty
-
 
         # wdistance = -(loss_fake + loss_real).item()
         # self.loss_dict['df_wdistance'].append(wdistance)
@@ -130,7 +132,8 @@ class emoTrainer:
         
         # print(gen_relative_word_length.shape, relative_word_length.shape)
         df = self.disc_word_len.forward(emotions_vec, gen_relative_word_length)
-        gan_loss = self.criterion(df, 'fake')
+        # gan_loss = self.criterion(df, 'fake')
+        gan_loss = -torch.mean(df)
 
         recon_loss = self.mse_loss(relative_word_length, gen_relative_word_length)
         recon_mean_loss = self.mse_loss(relative_word_length.mean(dim=1), gen_relative_word_length.mean(dim=1))

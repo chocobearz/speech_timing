@@ -85,7 +85,7 @@ class NOISEGENERATOR(nn.Module):
         super(NOISEGENERATOR, self).__init__()
         self.args = args
         self.noise = normal.Normal(0, 0.7)
-        self.noise_imle = normal.Normal(0, 7)
+        self.noise_imle = normal.Normal(0, 0.8)
         self.noise_rnn = nn.LSTM(self.args.noise_dim, self.args.noise_dim, num_layers=1, batch_first=True)
 
     def forward(self, z_spch):

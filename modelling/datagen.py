@@ -111,18 +111,19 @@ def process_data(data):
                 relative_word_length[i].extend([0]*(MAX_LEN-len(relative_word_length[i])))
             relative_word_length[i] = [float(x) if (float(x)<2.) else 2. for x in relative_word_length[i]]
 
-    return np.array(relative_word_length), np.array(emotion_label), np.array(text_vectors), np.array(emotions_vec), np.array(person_vec)
+    return np.array(relative_word_length), np.array(emotion_label), np.array(text_vectors), np.array(emotions_vec), np.array(person_vec), np.array(data.script.tolist())
     
 
 class GetDataset(Dataset):
     def __init__(self, filename, val=False, seed=0.1):
         self.filename = filename
         dataframe = read_csv(self.filename, seed)
-        self.relative_word_lengths, self.emotions, self.pos_vecs, self.emotions_vec, self.person_vec = process_data(dataframe)
+        self.relative_word_lengths, self.emotions, self.pos_vecs, self.emotions_vec, self.person_vec, self.script = process_data(dataframe)
         
         np.random.seed(10)
         indices = np.random.random_integers(0, high=len(self.emotions), size=int(0.9*len(self.emotions)))
 
+        self.val = val
         # if val:
         #     self.relative_word_lengths = self.relative_word_lengths[~indices]
         # else:
@@ -136,6 +137,9 @@ class GetDataset(Dataset):
         emotions_vec  = torch.tensor(self.emotions_vec[idx])
         people_vec = torch.tensor(self.person_vec[idx])
         emotions_label = torch.tensor(self.emotions[idx])
+
+        if self.val:
+            return relative_word_length, emotions_label, emotions_vec, pos_vec, people_vec, self.script[idx]
 
         return relative_word_length, emotions_label, emotions_vec, pos_vec, people_vec
         

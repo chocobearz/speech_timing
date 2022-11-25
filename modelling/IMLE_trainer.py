@@ -20,7 +20,7 @@ class emoTrainer:
         self.autoencoder = autoencoder
         self.imle = imle
         
-        self.run_name = 'IMLE_run'
+        self.run_name = 'IMLE_run_var_08'
         self.plotter = SummaryWriter('runs/' + self.run_name) 
         
         self.L2loss = torch.nn.MSELoss(reduction='mean')
@@ -48,8 +48,12 @@ class emoTrainer:
                 cnt+=1
 
     def saveNetworks(self):
-        out_file = os.path.join(self.args.out_path, self.run_name + 'autoencoder.pt')
-        torch.save(self.autoencoder.state_dict(), out_file)
+        if self.args.pre_train:
+            out_file = os.path.join(self.args.out_path, self.run_name + 'autoencoder.pt')
+            torch.save(self.autoencoder.state_dict(), out_file)
+        else:
+            out_file = os.path.join(self.args.out_path, self.run_name + '_IMLE.pt')
+            torch.save(self.imle.state_dict(), out_file)
         print('Networks has been saved')
 
     def step_generator(self, data):
@@ -124,7 +128,7 @@ class emoTrainer:
                 viterator = iter(self.val_loader)
                 with open(out_file, 'w') as f:
                     for t in range(len(self.val_loader)):
-                        relative_word_length, emotion_label, emotions_vec, pos_vec, people_vec = [d.float().to(self.args.device) for d in next(viterator)]
+                        relative_word_length, emotion_label, emotions_vec, pos_vec, people_vec, _ = [d.float().to(self.args.device) for d in next(viterator)]
                         data = [relative_word_length, emotion_label, emotions_vec, pos_vec, people_vec]
                         with torch.no_grad():
                                 gen_relative_word_length = self.autoencoder(emotions_vec, pos_vec, people_vec)
@@ -142,9 +146,9 @@ class emoTrainer:
             
             self.imle.eval()
             z = self.imle.module.encode(emotions_vec, pos_vec, people_vec)
-            encoded_vecs.extend(z.squeeze().tolist())
-        encoded_vecs = torch.Tensor(encoded_vecs)
-        print(encoded_vecs.var(), encoded_vecs.mean())
+            encoded_vecs.append(z.std())
+        encoded_vecs = torch.stack(encoded_vecs)
+        print(encoded_vecs.mean(), encoded_vecs.var())
 
         
     def train(self):
@@ -166,22 +170,25 @@ class emoTrainer:
             length = len(self.train_loader)
             self.plotter.add_scalar("lossIMLE/generate", loss/length, epoch)
 
+            if epoch%50==0:
+                self.saveNetworks()
+
         self.plotter.flush()
         self.plotter.close()
 
         
     def test(self):
-        diterator = iter(self.train_loader)
-        out_file = os.path.join(self.args.out_path, self.run_name + '_IMLE.txt')
+        diterator = iter(self.val_loader)
+        out_file = os.path.join(self.args.out_path, self.run_name + '_3samples_test.txt')
         with open(out_file, 'w') as f:
-            for _ in range(len(self.train_loader)):  
-                relative_word_length, emotion_label, emotions_vec, pos_vec, people_vec = [d.float().to(self.args.device) for d in next(diterator)]
-                
+            for _ in range(len(self.val_loader)):  
+                relative_word_length, emotion_label, emotions_vec, pos_vec, people_vec, script = [d for d in next(diterator)]
                 self.imle.eval()
                 with torch.no_grad():
-                    z = self.imle.module.encode(emotions_vec, pos_vec, people_vec)
-                    gen_relative_word_length = self.imle.module.get_single_latent_code(z, [z.shape[1], z.shape[2]])
-                    f.write('\t'.join([str(emotion_label.item()),
-                                    str(relative_word_length.tolist()[0]),
-                                    str(gen_relative_word_length.tolist()[0])])+'\n')
+                    for _ in range(3):
+                        z = self.imle.module.encode(emotions_vec.float(), pos_vec.float(), people_vec.float())
+                        gen_relative_word_length = self.imle.module.get_single_latent_code(z, [z.shape[1], z.shape[2]])
+                        f.write('\t'.join([str(emotion_label.item()), script[0],
+                                        str(relative_word_length.tolist()[0]),
+                                        str(gen_relative_word_length.tolist()[0])])+'\n')
         f.close()
