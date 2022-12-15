@@ -2,7 +2,6 @@ import argparse
 import json
 import os
 import random as rn
-import shutil
 
 import numpy as np 
 import torch
@@ -10,14 +9,14 @@ import torch.nn as nn
 
 import models
 from datagen import *
-import GAN_trainer, IMLE_trainer
+import IMLE_trainer
 
 def initParams():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("-f", "--filename", type=str, help="Input folder containing train data", default='../data/clean_data.csv')
     parser.add_argument("-o", "--out-path", type=str, help="output folder", default='outputs/')
     parser.add_argument("-m", "--model", type=str, help="Pre-trained model path", default='checkpoints/')
-    parser.add_argument('--num_epochs', type=int, default=1000)
+    parser.add_argument('--num_epochs', type=int, default=5000)
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument('--lr_g', type=float, default=0.0005)
     parser.add_argument('--lr_dsc', type=float, default=0.0005)
@@ -124,18 +123,15 @@ def imle_train():
                          train_loader=train_loader,
                          val_loader=val_loader)
     
-    emoTrainer.collect_variance()
+    # emoTrainer.collect_variance()
 
-    if args.pre_train:
-        emoTrainer.pre_train()
-    else:
-        emoTrainer.collect_variance()
-        emoTrainer.train()
+    # if args.pre_train:
+    #     emoTrainer.pre_train()
+    # else:
+    #     emoTrainer.train()
     
     emoTrainer.test()
 
 
 if __name__ == "__main__":
-    #train()
-    
     imle_train()

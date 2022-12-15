@@ -234,7 +234,7 @@ class DISCWORDLEN(nn.Module):
         self.scheduler = torch.optim.lr_scheduler.StepLR(self.opt, self.args.steplr, gamma=0.6, last_epoch=-1) 
     
     def forward(self, emotion, relative_word_length):
-        features = torch.tensor([torch.std(relative_word_length, dim=1), torch.max(relative_word_length, dim=1).values, torch.min(relative_word_length, dim=1).values, torch.mean(relative_word_length, dim=1)])
+        features = torch.tensor([torch.std(relative_word_length, dim=1), torch.max(relative_word_length, dim=1).values, torch.min(relative_word_length, dim=1).values, torch.mean(relative_word_length, dim=1)]).to(self.args.device)
         features = features.unsqueeze(dim=0)
         emotion = self.fc_1(emotion)
         h_ = torch.cat((emotion, features), 1)

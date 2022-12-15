@@ -20,7 +20,7 @@ class emoTrainer:
         self.autoencoder = autoencoder
         self.imle = imle
         
-        self.run_name = 'IMLE_run_var_08'
+        self.run_name = 'IMLE_run_TMP'
         self.plotter = SummaryWriter('runs_imle/' + self.run_name) 
         
         self.L2loss = torch.nn.MSELoss(reduction='mean')
@@ -72,8 +72,8 @@ class emoTrainer:
         torch.nn.utils.clip_grad_norm_(self.generator.parameters(), 1.)
         self.generator.module.opt.step()
 
-        if np.random.random() > 0.999:
-            print(np.round(gen_relative_word_length[:2,...].tolist(), 4), np.round(relative_word_length[:2,...].tolist(), 4), flush=True)
+        # if np.random.random() > 0.999:
+        #     print(np.round(gen_relative_word_length[:2,...].tolist(), 4), np.round(relative_word_length[:2,...].tolist(), 4), flush=True)
 
         losslst = np.array([loss.item(),  gan_loss.item(), loss.item()])
         return losslst
@@ -90,8 +90,8 @@ class emoTrainer:
         torch.nn.utils.clip_grad_norm_(self.autoencoder.parameters(), 3.)
         self.autoencoder.module.opt.step()
 
-        if np.random.random() > 0.9999:
-            print(np.round(gen_relative_word_length[:2,...].tolist(), 4), np.round(relative_word_length[:2,...].tolist(), 4), flush=True)
+        # if np.random.random() > 0.9999:
+        #     print(np.round(gen_relative_word_length[:2,...].tolist(), 4), np.round(relative_word_length[:2,...].tolist(), 4), flush=True)
 
         return loss.item()
     
@@ -161,34 +161,39 @@ class emoTrainer:
                 
                 self.imle.train()
                 z = self.imle.module.encode(emotions_vec, pos_vec, people_vec)
-                mindist_latent_code = self.imle.module.get_mindist_latent_codes(z, 16, self.args.batch_size, [z.shape[1], z.shape[2]], relative_word_length)
+                mindist_latent_code = self.imle.module.get_mindist_latent_codes(z, 8, self.args.batch_size, [z.shape[1], z.shape[2]], relative_word_length)
                 loss += self.step_imle(relative_word_length, mindist_latent_code)
                 
-                if np.random.random() > 0.9999:
-                    print(np.round(mindist_latent_code[:2,...].tolist(), 4), np.round(relative_word_length[:2,...].tolist(), 4), flush=True)
+                # if np.random.random() > 0.9999:
+                #     print(np.round(mindist_latent_code[:2,...].tolist(), 4), np.round(relative_word_length[:2,...].tolist(), 4), flush=True)
                 
             length = len(self.train_loader)
             self.plotter.add_scalar("lossIMLE/generate", loss/length, epoch)
 
-            if epoch%50==0:
+            if epoch%200==0:
+                self.test(epoch)
                 self.saveNetworks()
 
         self.plotter.flush()
         self.plotter.close()
 
         
-    def test(self):
+    def test(self, epoch=-1):
         diterator = iter(self.val_loader)
-        out_file = os.path.join(self.args.out_path, self.run_name + '_2samples_test.txt')
+        if epoch > -1:
+            out_file = os.path.join(self.args.out_path, self.run_name + str(epoch) + '.txt')
+        else:
+            out_file = os.path.join(self.args.out_path, self.run_name + '_test.txt')
         with open(out_file, 'w') as f:
             for _ in range(len(self.val_loader)):  
-                relative_word_length, emotion_label, emotions_vec, pos_vec, people_vec = [d for d in next(diterator)]
+                relative_word_length, emotion_label, emotions_vec, pos_vec, people_vec, script = [d for d in next(diterator)]
                 self.imle.eval()
                 with torch.no_grad():
-                    for _ in range(2):
-                        z = self.imle.module.encode(emotions_vec.float(), pos_vec.float(), people_vec.float())
-                        gen_relative_word_length = self.imle.module.get_single_latent_code(z, [z.shape[1], z.shape[2]])
-                        f.write('\t'.join([str(emotion_label.item()),
-                                        str(relative_word_length.tolist()[0]),
-                                        str(gen_relative_word_length.tolist()[0])])+'\n')
+                    # for _ in range(2):
+                    gen_relative_word_length = self.autoencoder(emotions_vec.float(), pos_vec.float(), people_vec.float())
+                    # z = self.imle.module.encode(emotions_vec.float(), pos_vec.float(), people_vec.float())
+                    # gen_relative_word_length = self.imle.module.get_single_latent_code(z, [z.shape[1], z.shape[2]])
+                    f.write('\t'.join([str(emotion_label.item()), script[0],
+                                    str(relative_word_length.tolist()[0]),
+                                    str(gen_relative_word_length.tolist()[0])])+'\n')
         f.close()

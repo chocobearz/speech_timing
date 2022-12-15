@@ -1,0 +1,9 @@
+checkpoints/
+logs/
+runs/
+outputs/
+outputs_old/
+runs_clean/
+runs_imle/
+*.txt
+../Old/

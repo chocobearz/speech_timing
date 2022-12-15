@@ -3,7 +3,6 @@ import json
 import math
 import os
 import random as rn
-import shutil
 
 import numpy as np 
 import torch
@@ -18,8 +17,8 @@ def initParams():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("-f", "--filename", type=str, help="Input folder containing train data", default='../data/clean_data.csv')
     parser.add_argument("-o", "--out-path", type=str, help="output folder", default='outputs/')
-    parser.add_argument("-m", "--model", type=str, help="Pre-trained model path", default=None)
-    parser.add_argument('--num_epochs', type=int, default=4000)
+    parser.add_argument("-m", "--model", type=str, help="Pre-trained model path", default='checkpoints/')
+    parser.add_argument('--num_epochs', type=int, default=1000)
     parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument('--lr_g', type=float, default=0.0001)
     parser.add_argument('--lr_dsc', type=float, default=0.0001)
@@ -113,7 +112,7 @@ def train():
     #     generator.load_state_dict(torch.load(os.path.join(args.model, 'generator.pt'), map_location="cuda" if args.cuda else "cpu"), strict=True)
     #     print('Generator loaded...')
     # if args.disc_word_len:
-    #     disc_word_len.load_state_dict(torch.load(os.path.join(args.model_disc_frame, 'disc_frame.pt'), map_location="cuda" if args.cuda else "cpu"), strict=True)
+    #     disc_word_len.load_state_dict(torch.load(os.path.join(args.model, 'disc_word_len.pt'), map_location="cuda" if args.cuda else "cpu"), strict=True)
     #     print('Disc frame loaded...')
     
     emoTrainer = GAN_trainer.emoTrainer(args, 
@@ -128,55 +127,7 @@ def train():
     else:
         emoTrainer.train()
 
-
-def imle_train():
-    args = initParams()
-    
-    trainDset = GetDataset(args.filename)
-    valDset = GetDataset(args.filename, val=True)
-
-    train_loader = torch.utils.data.DataLoader(trainDset,
-                                               batch_size=args.batch_size, 
-                                               shuffle=True,
-                                               drop_last=True,
-                                               **args.kwargs)
-    val_loader = torch.utils.data.DataLoader(valDset,
-                                               batch_size=args.batch_size,
-                                               shuffle=False,
-                                               drop_last=True,
-                                               **args.kwargs)
-    device_ids = list(range(torch.cuda.device_count()))
-
-    generator = models.GENERATOR(args).to(args.device)
-    generator.apply(init_weights)
-    generator = nn.DataParallel(generator, device_ids)
-
-    autoencoder = models.AUTOENCODER(args).to(args.device)
-    autoencoder.apply(init_weights)
-    autoencoder = nn.DataParallel(autoencoder, device_ids)
-
-    # if args.model:
-    #     generator.load_state_dict(torch.load(os.path.join(args.model, 'generator.pt'), map_location="cuda" if args.cuda else "cpu"), strict=True)
-    #     print('Generator loaded...')
-    # if args.disc_word_len:
-    #     disc_word_len.load_state_dict(torch.load(os.path.join(args.model_disc_frame, 'disc_frame.pt'), map_location="cuda" if args.cuda else "cpu"), strict=True)
-    #     print('Disc frame loaded...')
-    
-    emoTrainer = IMLE_trainer.emoTrainer(args, 
-                         generator=generator,
-                         autoencoder=autoencoder,
-                        #  decoder=decoder,
-                         train_loader=train_loader,
-                         val_loader=val_loader)
-
-    # if args.pre_train:
-    #     emoTrainer.pre_train()
-    # else:
-    #     emoTrainer.train()
-
-
+    # emoTrainer.test()
 
 if __name__ == "__main__":
     train()
-    
-    # imle_train()

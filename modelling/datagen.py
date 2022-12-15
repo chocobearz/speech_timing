@@ -9,9 +9,8 @@ MAX_LEN = 0
 def read_csv(filename, seed=0.9):
     data = pd.read_csv(filename, sep=',').fillna(0)
     # data = data.dropna(subset=['base_word_lengths'])
-    data = data[data.emotion.isin(['A', 'N', 'H'])]
+    data = data[data.emotion.isin(['A', 'D', 'S'])]
     return data
-
 
 def get_pos_vector(postag_lst):
     unique_pos = {x for l in postag_lst for x in l}
@@ -91,7 +90,7 @@ def process_data(data):
     # emotions vector
     emotions = data.emotion.tolist()
     # emotion_dict = {'A':0, 'D':1, 'F':2, 'H':3, 'N':4, 'S':5}
-    emotion_dict = {'A':0, 'H':1, 'N':2}
+    emotion_dict = {'A':0, 'D':1, 'S':2}
     emotions_vec = []
     for i in range(len(emotions)):
         x = [0]*len(emotion_dict)
