@@ -11,8 +11,8 @@ to replace the one included in gentle aligner's original repo
 '''
 
 
-audioDirectory = '/localhome/ptuttosi/Documents/GAN/CREMA-D-master/AudioWAV/'
-alignerDirectory = '/localhome/ptuttosi/Documents/GAN/gentle/'
+audioDirectory = '/localhome/ptuttosi/Documents/GAN/speech_timing/audio/azure_base'
+alignerDirectory = '/localhome/ptuttosi/Documents/GAN/speech_timing/data_processing/gentle/'
 
 scripts = {
   "IEO": "It's eleven o'clock",
@@ -102,4 +102,4 @@ for root, dirs, files in os.walk(audioDirectory):
         new_row['neutral_relative_word_lengths'] = "NA"
       dataframe = pd.concat([dataframe, pd.Series(new_row).to_frame().T], ignore_index=True)
 
-dataframe.to_csv('../data/word_length.csv', index = False) 
+dataframe.to_csv('../data/word_length-base.csv', index = False) 
