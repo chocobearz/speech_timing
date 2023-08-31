@@ -1,0 +1,22 @@
+{
+  "name": "speech_timing",
+  "version": "1.0.0",
+  "description": "Pause length and rate of speech generation conditioned on emotions",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chocobearz/speech_timing.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/chocobearz/speech_timing/issues"
+  },
+  "homepage": "https://github.com/chocobearz/speech_timing#readme",
+  "dependencies": {
+    "microsoft-cognitiveservices-speech-sdk": "^1.26.0"
+  }
+}
